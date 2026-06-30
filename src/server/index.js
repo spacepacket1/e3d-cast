@@ -103,7 +103,7 @@ async function proxyRequest(req, res, targetBaseUrl) {
 async function handleUpload(req, res, options) {
   const body = JSON.parse(String(await readBody(req) || '{}') || '{}');
   const fileName = sanitizeFileName(body.fileName);
-  const uploadId = `pod2vid_upload_${crypto.randomBytes(8).toString('hex')}`;
+  const uploadId = `cast_upload_${crypto.randomBytes(8).toString('hex')}`;
   const uploadDir = options.uploadDir;
   ensureDir(uploadDir);
   const payload = String(body.dataBase64 || '');
@@ -166,13 +166,13 @@ function serveFile(res, filePath) {
 
 function createServer(config = {}) {
   const rootDir = config.rootDir || path.resolve(__dirname, '..', '..');
-  const uiDir = config.uiDir || getEnv('POD2VID_UI_DIR', path.join(rootDir, 'src', 'ui'));
+  const uiDir = config.uiDir || getEnv('CAST_UI_DIR', path.join(rootDir, 'src', 'ui'));
   const targetBaseUrl = config.spacepacketApiUrl || getEnv('SPACEPACKET_API_URL', 'http://localhost:3000');
-  const uploadDir = config.uploadDir || getEnv('POD2VID_UPLOAD_DIR', path.join(getEnv('POD2VID_STORAGE_DIR', '/tmp/e3d-pod2vid'), 'uploads'));
-  const publicBaseUrl = getEnv('POD2VID_PUBLIC_BASE_URL', 'https://pod2vid.e3d.ai');
-  const getE3dUrl = getEnv('POD2VID_GET_E3D_URL', 'https://e3d.ai/token');
+  const uploadDir = config.uploadDir || getEnv('CAST_UPLOAD_DIR', path.join(getEnv('CAST_STORAGE_DIR', '/tmp/e3d-pod2vid'), 'uploads'));
+  const publicBaseUrl = getEnv('CAST_PUBLIC_BASE_URL', 'https://cast.e3d.ai');
+  const getE3dUrl = getEnv('CAST_GET_E3D_URL', 'https://e3d.ai/token');
   const serviceToken = getEnv('SPACEPACKET_SERVICE_BEARER_TOKEN', '');
-  const allowFreeSampleRender = getEnv('POD2VID_ALLOW_FREE_SAMPLE_RENDER', 'true') !== 'false';
+  const allowFreeSampleRender = getEnv('CAST_ALLOW_FREE_SAMPLE_RENDER', 'true') !== 'false';
 
   ensureDir(uploadDir);
 
@@ -227,10 +227,10 @@ function createServer(config = {}) {
 }
 
 if (require.main === module) {
-  const port = Number(getEnv('POD2VID_UI_PORT', '3200'));
+  const port = Number(getEnv('CAST_UI_PORT', '3200'));
   const server = createServer();
   server.listen(port, () => {
-    console.log(`Pod2Vid UI server listening on http://127.0.0.1:${port}`);
+    console.log(`Cast UI server listening on http://127.0.0.1:${port}`);
   });
 }
 

@@ -10,7 +10,7 @@ const { Readable } = require('stream');
 const { handleUpload } = require('../src/server/index.js');
 
 test('upload helper writes the file and manifest', async () => {
-  const uploadDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pod2vid-upload-'));
+  const uploadDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cast-upload-'));
   const body = JSON.stringify({
     fileName: 'episode.mp3',
     contentType: 'audio/mpeg',
@@ -37,7 +37,7 @@ test('upload helper writes the file and manifest', async () => {
   await handleUpload(req, res, { uploadDir });
   assert.strictEqual(res.statusCode, 201);
   const payload = JSON.parse(Buffer.concat(chunks).toString('utf8'));
-  assert.ok(payload.uploadId.startsWith('pod2vid_upload_'));
+  assert.ok(payload.uploadId.startsWith('cast_upload_'));
   assert.ok(fs.existsSync(path.join(uploadDir, `${payload.uploadId}.json`)));
   assert.ok(fs.existsSync(payload.path));
 });

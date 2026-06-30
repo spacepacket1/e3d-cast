@@ -1,7 +1,7 @@
 'use strict';
 
 (function () {
-  const STORAGE_KEY = 'pod2vid-ui-state-v1';
+  const STORAGE_KEY = 'cast-ui-state-v1';
   const modes = [
     { id: 'upload', label: 'Upload', copy: 'Choose a local media file and register it with the service upload helper.' },
     { id: 'url', label: 'Source URL', copy: 'Quote and dispatch a hosted fetch from a public media URL.' },
@@ -111,16 +111,16 @@
     mode: 'transcript',
     preset: 'transcript_short',
     subtitleStyle: 'bold_mobile',
-    transcriptText: 'Host: Welcome to Pod2Vid.\nGuest: Today we are previewing a hosted dry-run render on E3D.',
+    transcriptText: 'Host: Welcome to Cast.\nGuest: Today we are previewing a hosted dry-run render on E3D.',
     sourceUrl: '',
     upload: null,
     selectedSampleId: samples[0].id,
-    title: 'Pod2Vid transcript short',
+    title: 'Cast transcript short',
     description: 'Preview subtitle style, watermark state, metadata, and dry-run pricing before spend.',
-    tags: 'pod2vid,e3d,transcript',
+    tags: 'cast,e3d,transcript',
     archiveToIpfs: false,
     brandEndCard: true,
-    madeWithPod2Vid: true,
+    madeWithCast: true,
     freeSampleAttemptsUsed: 0,
     quote: null,
     purchaseQuote: null,
@@ -152,7 +152,7 @@
       tags: state.tags,
       archiveToIpfs: state.archiveToIpfs,
       brandEndCard: state.brandEndCard,
-      madeWithPod2Vid: state.madeWithPod2Vid,
+      madeWithCast: state.madeWithCast,
       freeSampleAttemptsUsed: state.freeSampleAttemptsUsed,
       jobs: state.jobs,
       selectedJobId: state.selectedJobId,
@@ -231,7 +231,7 @@
       generateThumbnail: true,
       platforms: ['youtube', 'x'],
       publish: false,
-      madeWithPod2Vid: state.madeWithPod2Vid,
+      madeWithCast: state.madeWithCast,
     };
   }
 
@@ -389,13 +389,13 @@
     const watermarkOn = currentTier() === 'free' || state.mode === 'sample';
     els.previewAspect.textContent = preset.aspect;
     els.previewCaption.textContent = `${styles.find((entry) => entry.id === state.subtitleStyle).title} captions preview`;
-    els.previewWatermark.textContent = watermarkOn ? 'pod2vid.e3d.ai' : 'Made with Pod2Vid';
-    els.previewTitle.textContent = state.title || 'Pod2Vid preview title';
+    els.previewWatermark.textContent = watermarkOn ? 'cast.e3d.ai' : 'Made with Cast';
+    els.previewTitle.textContent = state.title || 'Cast preview title';
     els.previewDescription.textContent = state.description || 'Description preview';
     els.watermarkCopy.textContent = watermarkOn
-      ? 'Free/sample renders show the Pod2Vid watermark and a 24-hour retention window.'
+      ? 'Free/sample renders show the Cast watermark and a 24-hour retention window.'
       : 'Paid tiers remove the watermark. End card stays on by default for a small rebate.';
-    els.rebateCopy.textContent = state.madeWithPod2Vid
+    els.rebateCopy.textContent = state.madeWithCast
       ? 'End card kept on: rebate preview active for paid jobs.'
       : 'End card off: no rebate preview.';
   }
@@ -502,8 +502,8 @@
 
   async function fetchRemoteJob(job) {
     const headers = state.creditKey ? { authorization: `Bearer ${state.creditKey}` } : {};
-    const status = await apiJson(`/api/pod2vid/jobs/${job.jobId}`, { headers });
-    const artifacts = await apiJson(`/api/pod2vid/jobs/${job.jobId}/artifacts`, { headers });
+    const status = await apiJson(`/api/cast/jobs/${job.jobId}`, { headers });
+    const artifacts = await apiJson(`/api/cast/jobs/${job.jobId}/artifacts`, { headers });
     job.remoteStatus = status;
     job.artifacts = artifacts.artifacts;
     return job;
@@ -568,28 +568,28 @@ ${Object.keys(archive).length ? `\n${JSON.stringify(archive, null, 2)}` : '\nCon
       input: currentInput(),
       preset: state.preset,
       options: currentOptions(),
-      webhookUrl: 'https://agent.example.com/hooks/pod2vid',
+      webhookUrl: 'https://agent.example.com/hooks/cast',
     };
     els.agentMode.innerHTML = `
       <div class="code-card">
         <strong>curl capabilities</strong>
-        <pre>curl -s ${location.origin}/api/pod2vid/capabilities</pre>
+        <pre>curl -s ${location.origin}/api/cast/capabilities</pre>
       </div>
       <div class="code-card">
         <strong>curl quote</strong>
-        <pre>curl -s -X POST ${location.origin}/api/pod2vid/jobs/quote -H 'content-type: application/json' -d '${JSON.stringify(quoteBody, null, 2)}'</pre>
+        <pre>curl -s -X POST ${location.origin}/api/cast/jobs/quote -H 'content-type: application/json' -d '${JSON.stringify(quoteBody, null, 2)}'</pre>
       </div>
       <div class="code-card">
         <strong>curl submit</strong>
-        <pre>curl -s -X POST ${location.origin}/api/pod2vid/jobs \\
-  -H 'Authorization: Bearer &lt;e3d_pod2vid_pay_...&gt;' \\
-  -H 'Idempotency-Key: pod2vid-demo-001' \\
+        <pre>curl -s -X POST ${location.origin}/api/cast/jobs \\
+  -H 'Authorization: Bearer &lt;e3d_cast_pay_...&gt;' \\
+  -H 'Idempotency-Key: cast-demo-001' \\
   -H 'content-type: application/json' \\
   -d '${JSON.stringify(submitBody, null, 2)}'</pre>
       </div>
       <div class="code-card">
         <strong>e3d-agent</strong>
-        <pre>e3d-agent pod2vid render --preset ${state.preset} --dry-run --webhook https://agent.example.com/hooks/pod2vid</pre>
+        <pre>e3d-agent cast render --preset ${state.preset} --dry-run --webhook https://agent.example.com/hooks/cast</pre>
       </div>
     `;
   }
@@ -599,7 +599,7 @@ ${Object.keys(archive).length ? `\n${JSON.stringify(archive, null, 2)}` : '\nCon
     try {
       const headers = { 'content-type': 'application/json' };
       if (state.creditKey) headers.authorization = `Bearer ${state.creditKey}`;
-      state.quote = await apiJson('/api/pod2vid/jobs/quote', {
+      state.quote = await apiJson('/api/cast/jobs/quote', {
         method: 'POST',
         headers,
         body: JSON.stringify({
@@ -629,7 +629,7 @@ ${Object.keys(archive).length ? `\n${JSON.stringify(archive, null, 2)}` : '\nCon
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
-        product: 'pod2vid',
+        product: 'cast',
         wallet: state.wallet,
         requestedIssuedCredits: Number(els.creditRequest.value || 1000),
       }),
@@ -644,7 +644,7 @@ ${Object.keys(archive).length ? `\n${JSON.stringify(archive, null, 2)}` : '\nCon
       method: 'POST',
       headers: { 'content-type': 'application/json' },
       body: JSON.stringify({
-        product: 'pod2vid',
+        product: 'cast',
         wallet: state.wallet,
         txHash: els.txHash.value.trim(),
         paymentMethod: els.paymentMethod.value,
@@ -657,7 +657,7 @@ ${Object.keys(archive).length ? `\n${JSON.stringify(archive, null, 2)}` : '\nCon
 
   async function refreshBalance() {
     if (!state.creditKey) return;
-    const balance = await apiJson('/api/payments/credits/balance?product=pod2vid', {
+    const balance = await apiJson('/api/payments/credits/balance?product=cast', {
       headers: { authorization: `Bearer ${state.creditKey}` },
     });
     state.creditBalance = balance.credits;
@@ -670,7 +670,7 @@ ${Object.keys(archive).length ? `\n${JSON.stringify(archive, null, 2)}` : '\nCon
       els.quoteStatus.textContent = 'Get E3D / buy credits first';
       return;
     }
-    const submission = await apiJson('/api/pod2vid/jobs', {
+    const submission = await apiJson('/api/cast/jobs', {
       method: 'POST',
       headers: {
         authorization: `Bearer ${state.creditKey}`,
@@ -725,7 +725,7 @@ ${Object.keys(archive).length ? `\n${JSON.stringify(archive, null, 2)}` : '\nCon
 
   async function runRevision(job, revisionType) {
     if (job.kind === 'local-sample') return;
-    const submission = await apiJson(`/api/pod2vid/jobs/${job.jobId}/revise`, {
+    const submission = await apiJson(`/api/cast/jobs/${job.jobId}/revise`, {
       method: 'POST',
       headers: {
         authorization: `Bearer ${state.creditKey}`,
@@ -759,7 +759,7 @@ ${Object.keys(archive).length ? `\n${JSON.stringify(archive, null, 2)}` : '\nCon
 
   async function archiveJob(job) {
     if (job.kind === 'local-sample') return;
-    await apiJson(`/api/pod2vid/jobs/${job.jobId}/archive-ipfs`, {
+    await apiJson(`/api/cast/jobs/${job.jobId}/archive-ipfs`, {
       method: 'POST',
       headers: {
         authorization: `Bearer ${state.creditKey}`,
@@ -787,13 +787,13 @@ ${Object.keys(archive).length ? `\n${JSON.stringify(archive, null, 2)}` : '\nCon
 
   async function init() {
     state.config = await apiJson('/ui-api/config');
-    state.capabilities = await apiJson('/api/pod2vid/capabilities');
+    state.capabilities = await apiJson('/api/cast/capabilities');
     els.getE3dLink.href = state.config.getE3dUrl;
     els.titleInput.value = state.title;
     els.descriptionInput.value = state.description;
     els.tagsInput.value = state.tags;
     els.brandEndCard.checked = state.brandEndCard;
-    els.madeWithToggle.checked = state.madeWithPod2Vid;
+    els.madeWithToggle.checked = state.madeWithCast;
     els.archiveToggle.checked = state.archiveToIpfs;
 
     els.connectWallet.addEventListener('click', connectWallet);
@@ -807,7 +807,7 @@ ${Object.keys(archive).length ? `\n${JSON.stringify(archive, null, 2)}` : '\nCon
     els.descriptionInput.addEventListener('input', (event) => { state.description = event.target.value; persistState(); renderPreview(); });
     els.tagsInput.addEventListener('input', (event) => { state.tags = event.target.value; persistState(); });
     els.brandEndCard.addEventListener('change', (event) => { state.brandEndCard = event.target.checked; persistState(); renderPreview(); });
-    els.madeWithToggle.addEventListener('change', (event) => { state.madeWithPod2Vid = event.target.checked; persistState(); renderPreview(); });
+    els.madeWithToggle.addEventListener('change', (event) => { state.madeWithCast = event.target.checked; persistState(); renderPreview(); });
     els.archiveToggle.addEventListener('change', (event) => { state.archiveToIpfs = event.target.checked; persistState(); });
 
     if (state.creditKey) {

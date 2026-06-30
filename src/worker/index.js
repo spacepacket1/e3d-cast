@@ -106,7 +106,7 @@ async function downloadUrlToFile(url, destinationPath) {
 async function buildWorkerManifest(job, config) {
   const tier = TIER_CONFIG[job.tier] || TIER_CONFIG.starter;
   const manifest = {
-    kind: 'pod2vid_job',
+    kind: 'cast_job',
     version: '1.0',
     jobId: job.jobId,
     parentJobId: job.parentJobId || undefined,
@@ -125,7 +125,7 @@ async function buildWorkerManifest(job, config) {
     brandKit: {
       endCard: job.options && job.options.brandEndCard === false ? false : true,
       watermarkMode: tier.watermarked ? 'force_on' : 'tier_default',
-      watermarkText: tier.watermarked ? 'pod2vid.e3d.ai' : 'Made with Pod2Vid',
+      watermarkText: tier.watermarked ? 'cast.e3d.ai' : 'Made with Cast',
     },
     platformMetadata: {
       title: job.options && job.options.title,
@@ -262,7 +262,7 @@ function finalizeJobSuccess(job, config) {
   job.errorCode = '';
   job.errorMessage = '';
   job.artifactExpiresAt = artifactManifest.localRetentionExpiresAt || null;
-  job.artifactManifestUrl = `/api/pod2vid/jobs/${job.jobId}/artifacts`;
+  job.artifactManifestUrl = `/api/cast/jobs/${job.jobId}/artifacts`;
   job.artifacts = artifactManifest.artifacts.map((artifact) => copyArtifactToStore(config.storageDir, job.jobId, artifact));
   job.actualArtifactBytes = job.artifacts.reduce((sum, artifact) => sum + Number(artifact.bytes || 0), 0);
   if (archiveManifest) {
@@ -308,8 +308,8 @@ async function runRunner(manifestPath, config, job) {
     cwd: config.pipelineDir,
     env: {
       ...process.env,
-      POD2VID_STORAGE_DIR: config.storageDir,
-      POD2VID_PIPELINE_DIR: config.pipelineDir,
+      CAST_STORAGE_DIR: config.storageDir,
+      CAST_PIPELINE_DIR: config.pipelineDir,
     },
     stdio: ['ignore', 'pipe', 'pipe'],
   });
@@ -397,15 +397,15 @@ async function processNextQueuedJob(config = readConfig()) {
 }
 
 function readConfig() {
-  const storageDir = getEnv('POD2VID_STORAGE_DIR', '/tmp/e3d-pod2vid');
+  const storageDir = getEnv('CAST_STORAGE_DIR', '/tmp/e3d-pod2vid');
   return {
     storageDir,
-    uploadDir: getEnv('POD2VID_UPLOAD_DIR', path.join(storageDir, 'uploads')),
-    manifestDir: getEnv('POD2VID_WORKER_MANIFEST_DIR', path.join(storageDir, 'worker-manifests')),
-    pollMs: Number(getEnv('POD2VID_WORKER_POLL_MS', '5000')),
-    timeoutMs: Number(getEnv('POD2VID_WORKER_TIMEOUT_MS', '1200000')),
-    runnerPath: getEnv('POD2VID_JOB_RUNNER', '/home/ubuntu/e3d-pod2vid/bin/pod2vid-job.py'),
-    pipelineDir: getEnv('POD2VID_PIPELINE_DIR', '/home/ubuntu/e3d-pod2vid'),
+    uploadDir: getEnv('CAST_UPLOAD_DIR', path.join(storageDir, 'uploads')),
+    manifestDir: getEnv('CAST_WORKER_MANIFEST_DIR', path.join(storageDir, 'worker-manifests')),
+    pollMs: Number(getEnv('CAST_WORKER_POLL_MS', '5000')),
+    timeoutMs: Number(getEnv('CAST_WORKER_TIMEOUT_MS', '1200000')),
+    runnerPath: getEnv('CAST_JOB_RUNNER', '/home/ubuntu/e3d-pod2vid/bin/pod2vid-job.py'),
+    pipelineDir: getEnv('CAST_PIPELINE_DIR', '/home/ubuntu/e3d-pod2vid'),
   };
 }
 

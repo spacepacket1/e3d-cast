@@ -40,8 +40,8 @@ async function invoke(server, { method, url, headers, body }) {
 }
 
 test('ui config returns the configured public base URL and Get E3D link', async () => {
-  process.env.POD2VID_PUBLIC_BASE_URL = 'https://pod2vid.e3d.ai';
-  process.env.POD2VID_GET_E3D_URL = 'https://e3d.ai/token';
+  process.env.CAST_PUBLIC_BASE_URL = 'https://cast.e3d.ai';
+  process.env.CAST_GET_E3D_URL = 'https://e3d.ai/token';
   const server = createServer({
     rootDir: process.cwd(),
     uiDir: path.join(process.cwd(), 'src', 'ui'),
@@ -51,11 +51,11 @@ test('ui config returns the configured public base URL and Get E3D link', async 
     const response = await invoke(server, { method: 'GET', url: '/ui-api/config' });
     assert.strictEqual(response.statusCode, 200);
     const payload = JSON.parse(response.body);
-    assert.strictEqual(payload.publicBaseUrl, 'https://pod2vid.e3d.ai');
+    assert.strictEqual(payload.publicBaseUrl, 'https://cast.e3d.ai');
     assert.strictEqual(payload.getE3dUrl, 'https://e3d.ai/token');
   } finally {
-    delete process.env.POD2VID_PUBLIC_BASE_URL;
-    delete process.env.POD2VID_GET_E3D_URL;
+    delete process.env.CAST_PUBLIC_BASE_URL;
+    delete process.env.CAST_GET_E3D_URL;
   }
 });
 
@@ -67,6 +67,6 @@ test('ui home serves the workspace shell', async () => {
 
   const response = await invoke(server, { method: 'GET', url: '/' });
   assert.strictEqual(response.statusCode, 200);
-  assert.match(response.body, /Pod2Vid on E3D/);
+  assert.match(response.body, /Cast on E3D/);
   assert.match(response.body, /id="get-e3d-link"/);
 });

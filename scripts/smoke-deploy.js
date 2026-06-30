@@ -33,11 +33,11 @@ async function expectOk(url, label, options = {}) {
 }
 
 async function main() {
-  const baseUrl = getArg('base-url', 'https://pod2vid.e3d.ai').replace(/\/+$/, '');
+  const baseUrl = getArg('base-url', 'https://cast.e3d.ai').replace(/\/+$/, '');
   const creditKey = getArg('credit-key', '');
   const transcriptText = getArg(
     'transcript-text',
-    'Pod2Vid deployment smoke test transcript. This is a dry-run paid submission path check.'
+    'Cast deployment smoke test transcript. This is a dry-run paid submission path check.'
   );
 
   console.log(`Smoke target: ${baseUrl}`);
@@ -55,29 +55,29 @@ async function main() {
   }
   console.log('PASS ui-config');
 
-  const healthResult = await expectOk(`${baseUrl}/api/pod2vid/health`, 'Pod2Vid health');
-  const health = parseJson(healthResult.text, 'Pod2Vid health');
+  const healthResult = await expectOk(`${baseUrl}/api/cast/health`, 'Cast health');
+  const health = parseJson(healthResult.text, 'Cast health');
   if (health.status !== 'healthy') {
     throw new Error(`Health endpoint returned unexpected status: ${health.status || '<missing>'}`);
   }
-  console.log('PASS pod2vid-health');
+  console.log('PASS cast-health');
 
-  const capabilitiesResult = await expectOk(`${baseUrl}/api/pod2vid/capabilities`, 'Pod2Vid capabilities');
-  const capabilities = parseJson(capabilitiesResult.text, 'Pod2Vid capabilities');
+  const capabilitiesResult = await expectOk(`${baseUrl}/api/cast/capabilities`, 'Cast capabilities');
+  const capabilities = parseJson(capabilitiesResult.text, 'Cast capabilities');
   if (!Array.isArray(capabilities.tiers) || capabilities.tiers.length === 0) {
     throw new Error('Capabilities response did not include any tiers');
   }
   console.log('PASS capabilities');
 
-  const openApiResult = await expectOk(`${baseUrl}/openapi/e3d-pod2vid.yaml`, 'OpenAPI document');
+  const openApiResult = await expectOk(`${baseUrl}/openapi/e3d-cast.yaml`, 'OpenAPI document');
   if (!/openapi:\s*3\./.test(openApiResult.text)) {
     throw new Error('OpenAPI document did not look like an OpenAPI 3 spec');
   }
   console.log('PASS openapi');
 
   const llmsResult = await expectOk(`${baseUrl}/llms.txt`, 'llms.txt');
-  if (!/pod2vid/i.test(llmsResult.text)) {
-    throw new Error('llms.txt did not mention Pod2Vid');
+  if (!/cast/i.test(llmsResult.text)) {
+    throw new Error('llms.txt did not mention Cast');
   }
   console.log('PASS llms-txt');
 
@@ -86,7 +86,7 @@ async function main() {
     'agent capabilities'
   );
   const agentCapabilities = parseJson(agentCapsResult.text, 'agent capabilities');
-  if (agentCapabilities.openapiUrl !== `${baseUrl}/openapi/e3d-pod2vid.yaml`) {
+  if (agentCapabilities.openapiUrl !== `${baseUrl}/openapi/e3d-cast.yaml`) {
     throw new Error(`Unexpected OpenAPI URL in agent capabilities: ${agentCapabilities.openapiUrl || '<missing>'}`);
   }
   console.log('PASS agent-capabilities');
@@ -96,7 +96,7 @@ async function main() {
     return;
   }
 
-  const submitResult = await expectOk(`${baseUrl}/api/pod2vid/jobs`, 'Paid dry-run submit', {
+  const submitResult = await expectOk(`${baseUrl}/api/cast/jobs`, 'Paid dry-run submit', {
     method: 'POST',
     headers: {
       authorization: `Bearer ${creditKey}`,
@@ -112,7 +112,7 @@ async function main() {
         dryRun: true,
         subtitleStyle: 'bold_mobile',
         brandEndCard: true,
-        madeWithPod2Vid: true,
+        madeWithCast: true,
         archiveToIpfs: false,
         title: 'Deployment smoke dry-run',
         description: 'Production deployment smoke validation.',

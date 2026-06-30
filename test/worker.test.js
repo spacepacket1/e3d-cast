@@ -9,7 +9,7 @@ const test = require('node:test');
 const { processNextQueuedJob } = require('../src/worker/index.js');
 
 test('worker claims a queued job, runs the runner, and writes artifacts back to the API store', async () => {
-  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'pod2vid-worker-'));
+  const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cast-worker-'));
   const storageDir = path.join(tempDir, 'storage');
   const uploadDir = path.join(storageDir, 'uploads');
   const manifestDir = path.join(storageDir, 'worker-manifests');
@@ -23,7 +23,7 @@ test('worker claims a queued job, runs the runner, and writes artifacts back to 
 const fs = require('fs');
 const path = require('path');
 const manifest = JSON.parse(fs.readFileSync(process.argv[2], 'utf8'));
-const jobDir = path.join(process.env.POD2VID_STORAGE_DIR, 'jobs', manifest.jobId);
+const jobDir = path.join(process.env.CAST_STORAGE_DIR, 'jobs', manifest.jobId);
 const artifactDir = path.join(jobDir, 'artifacts');
 fs.mkdirSync(artifactDir, { recursive: true });
 const videoPath = path.join(artifactDir, 'video.mp4');
@@ -63,7 +63,7 @@ console.log(JSON.stringify({ event: 'job.completed', jobId: manifest.jobId, stat
 `);
   fs.chmodSync(runnerPath, 0o755);
 
-  const uploadId = 'pod2vid_upload_test';
+  const uploadId = 'cast_upload_test';
   const uploadFile = path.join(uploadDir, `${uploadId}.mp3`);
   fs.writeFileSync(uploadFile, Buffer.from('audio'));
   fs.writeFileSync(path.join(uploadDir, `${uploadId}.json`), JSON.stringify({
@@ -73,9 +73,9 @@ console.log(JSON.stringify({ event: 'job.completed', jobId: manifest.jobId, stat
     path: uploadFile,
   }, null, 2));
 
-  const jobPath = path.join(storageDir, 'jobs', 'pod2vid_job_test.json');
+  const jobPath = path.join(storageDir, 'jobs', 'cast_job_test.json');
   fs.writeFileSync(jobPath, JSON.stringify({
-    jobId: 'pod2vid_job_test',
+    jobId: 'cast_job_test',
     status: 'queued',
     createdAt: '2026-06-30T00:00:00.000Z',
     inputKind: 'upload',
@@ -108,5 +108,5 @@ console.log(JSON.stringify({ event: 'job.completed', jobId: manifest.jobId, stat
   assert.ok(Array.isArray(stored.artifacts));
   assert.ok(stored.artifacts.some((artifact) => artifact.artifactId === 'video'));
   assert.ok(stored.artifacts.some((artifact) => artifact.artifactId === 'manifest'));
-  assert.ok(fs.existsSync(path.join(storageDir, 'artifacts', 'pod2vid_job_test', 'video.mp4')));
+  assert.ok(fs.existsSync(path.join(storageDir, 'artifacts', 'cast_job_test', 'video.mp4')));
 });

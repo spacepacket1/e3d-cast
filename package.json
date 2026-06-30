@@ -6,7 +6,7 @@
   "scripts": {
     "dev": "node src/server/index.js",
     "build": "node scripts/build-ui.js",
-    "preview": "POD2VID_UI_DIR=dist node src/server/index.js",
+    "preview": "CAST_UI_DIR=dist node src/server/index.js",
     "worker": "node src/worker/index.js",
     "smoke:deploy": "node scripts/smoke-deploy.js",
     "test": "node --test"
