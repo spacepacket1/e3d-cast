@@ -2,13 +2,14 @@
   "name": "e3d-pod2vid-service",
   "version": "0.1.0",
   "private": true,
-  "description": "Hosted Pod2Vid service — UI, worker daemon, and deployment for pod2vid.e3d.ai",
+  "description": "Hosted Cast service — UI, worker daemon, and deployment for cast.e3d.ai",
   "scripts": {
-    "dev": "vite",
-    "build": "vite build",
-    "preview": "vite preview",
+    "dev": "node src/server/index.js",
+    "build": "node scripts/build-ui.js",
+    "preview": "POD2VID_UI_DIR=dist node src/server/index.js",
     "worker": "node src/worker/index.js",
-    "test": "echo \"No tests yet\" && exit 0"
+    "smoke:deploy": "node scripts/smoke-deploy.js",
+    "test": "node --test"
   },
   "engines": {
     "node": ">=20"

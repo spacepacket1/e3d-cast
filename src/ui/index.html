@@ -1,0 +1,191 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Pod2Vid on E3D</title>
+    <link rel="stylesheet" href="/styles.css">
+  </head>
+  <body>
+    <div class="page-shell">
+      <header class="topbar">
+        <div>
+          <p class="eyebrow">Hosted Workspace</p>
+          <h1>Pod2Vid on E3D</h1>
+          <p class="subhead">Paste a transcript, upload source media, or use a public sample. Quote first, spend credits once, track artifacts after.</p>
+        </div>
+        <div class="topbar-actions">
+          <button id="connect-wallet" class="button secondary">Connect Wallet</button>
+          <a id="get-e3d-link" class="button ghost" target="_blank" rel="noreferrer">Get E3D</a>
+        </div>
+      </header>
+
+      <section class="status-grid">
+        <article class="status-card">
+          <span class="label">Wallet</span>
+          <strong id="wallet-display">Not connected</strong>
+          <span id="holder-badge" class="badge muted">Holder discount unknown</span>
+        </article>
+        <article class="status-card">
+          <span class="label">Credits</span>
+          <strong id="credit-balance">No credit key</strong>
+          <span id="credit-key-label" class="mono small">Balance unavailable</span>
+        </article>
+        <article class="status-card">
+          <span class="label">Tier</span>
+          <strong id="active-tier">Starter</strong>
+          <span id="free-attempts" class="small">Free sample attempts remaining: 3</span>
+        </article>
+        <article class="status-card">
+          <span class="label">Mint</span>
+          <strong>false</strong>
+          <span class="small">NFT provenance is deferred to Phase 7.</span>
+        </article>
+      </section>
+
+      <main class="workspace-grid">
+        <section class="panel creation-panel">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">Workspace</p>
+              <h2>Create a render</h2>
+            </div>
+            <span id="submit-state" class="badge">Ready to quote</span>
+          </div>
+
+          <div class="tab-row" id="input-mode-tabs"></div>
+          <div id="input-mode-panel" class="input-panel"></div>
+
+          <div class="section-block">
+            <p class="section-title">Output preset</p>
+            <div class="preset-grid" id="preset-grid"></div>
+          </div>
+
+          <div class="two-column">
+            <div class="section-block">
+              <p class="section-title">Caption style</p>
+              <div class="style-grid" id="style-grid"></div>
+            </div>
+            <div class="section-block">
+              <p class="section-title">Brand kit</p>
+              <label class="toggle-row"><input id="brand-end-card" type="checkbox" checked> End card enabled</label>
+              <label class="toggle-row"><input id="made-with-toggle" type="checkbox" checked> Made with Pod2Vid rebate enabled</label>
+              <label class="toggle-row"><input id="archive-toggle" type="checkbox"> Archive to IPFS after completion</label>
+              <p id="watermark-copy" class="small"></p>
+              <p class="small">Holder rebate preview: <span id="rebate-copy">Leave the end card on for a small paid-tier rebate.</span></p>
+            </div>
+          </div>
+
+          <div class="two-column">
+            <div class="section-block">
+              <p class="section-title">Platform metadata</p>
+              <input id="title-input" class="text-input" type="text" placeholder="Video title">
+              <textarea id="description-input" class="text-area compact" placeholder="Description"></textarea>
+              <input id="tags-input" class="text-input" type="text" placeholder="tags, comma, separated">
+            </div>
+            <div class="section-block">
+              <p class="section-title">Preview frame</p>
+              <div id="preview-frame" class="preview-frame">
+                <div class="preview-video">
+                  <span id="preview-aspect">9:16</span>
+                  <div id="preview-caption" class="preview-caption">Bold mobile captions preview</div>
+                  <div id="preview-watermark" class="preview-watermark">pod2vid.e3d.ai</div>
+                </div>
+                <div class="preview-meta">
+                  <strong id="preview-title">Pod2Vid transcript short</strong>
+                  <p id="preview-description">Quote a render to preview style, watermark, and metadata before paid submission.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <div class="action-row">
+            <button id="quote-job" class="button primary">Get quote</button>
+            <button id="submit-job" class="button secondary">Submit paid dry-run</button>
+            <button id="try-free-render" class="button ghost">Try free render</button>
+          </div>
+        </section>
+
+        <aside class="sidebar">
+          <section class="panel">
+            <div class="panel-header">
+              <div>
+                <p class="eyebrow">Quote</p>
+                <h2>Spend preview</h2>
+              </div>
+              <span id="quote-status" class="badge muted">Awaiting quote</span>
+            </div>
+            <div id="quote-panel" class="quote-panel"></div>
+          </section>
+
+          <section class="panel">
+            <div class="panel-header">
+              <div>
+                <p class="eyebrow">Payments</p>
+                <h2>Buy or refresh credits</h2>
+              </div>
+            </div>
+            <div class="payment-controls">
+              <input id="credit-request" class="text-input" type="number" min="100" step="100" value="1000">
+              <button id="quote-purchase" class="button secondary">Quote credit purchase</button>
+              <div id="purchase-quote" class="info-stack"></div>
+              <input id="tx-hash" class="text-input mono" type="text" placeholder="0x transaction hash">
+              <select id="payment-method" class="text-input">
+                <option value="base-we3d">Base wE3D</option>
+                <option value="ethereum-e3d">Ethereum E3D</option>
+              </select>
+              <button id="register-purchase" class="button secondary">Register purchase</button>
+              <button id="refresh-balance" class="button ghost">Refresh balance</button>
+            </div>
+          </section>
+        </aside>
+      </main>
+
+      <section class="lower-grid">
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">Samples</p>
+              <h2>Public sample gallery</h2>
+            </div>
+          </div>
+          <div id="sample-gallery" class="sample-gallery"></div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">Jobs</p>
+              <h2>Recent jobs</h2>
+            </div>
+          </div>
+          <div id="jobs-list" class="jobs-list"></div>
+        </section>
+      </section>
+
+      <section class="lower-grid">
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">Job Detail</p>
+              <h2>Artifacts and revisions</h2>
+            </div>
+          </div>
+          <div id="job-detail" class="job-detail empty-state">Submit a dry-run or free sample render to inspect artifacts, archive options, and revision actions.</div>
+        </section>
+
+        <section class="panel">
+          <div class="panel-header">
+            <div>
+              <p class="eyebrow">Agent Mode</p>
+              <h2>CLI and API examples</h2>
+            </div>
+          </div>
+          <div id="agent-mode" class="agent-mode"></div>
+        </section>
+      </section>
+    </div>
+
+    <script src="/app.js"></script>
+  </body>
+</html>
