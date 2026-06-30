@@ -1,0 +1,16 @@
+{
+  "name": "e3d-pod2vid-service",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Hosted Pod2Vid service — UI, worker daemon, and deployment for pod2vid.e3d.ai",
+  "scripts": {
+    "dev": "vite",
+    "build": "vite build",
+    "preview": "vite preview",
+    "worker": "node src/worker/index.js",
+    "test": "echo \"No tests yet\" && exit 0"
+  },
+  "engines": {
+    "node": ">=20"
+  }
+}
