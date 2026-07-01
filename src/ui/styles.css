@@ -373,6 +373,42 @@ pre {
   overflow: auto;
 }
 
+.powered-by {
+  font-size: 0.9rem;
+  font-family: var(--body);
+  font-weight: 400;
+  opacity: 0.45;
+  letter-spacing: 0;
+  vertical-align: super;
+  display: inline-block;
+  margin-left: 4px;
+}
+
+.wallet-dot {
+  display: inline-block;
+  width: 10px;
+  height: 10px;
+  border-radius: 50%;
+  margin-right: 7px;
+  vertical-align: middle;
+  flex-shrink: 0;
+}
+
+.wallet-dot.connected {
+  background: var(--success);
+  box-shadow: 0 0 0 3px rgba(31, 122, 76, 0.2);
+}
+
+.wallet-dot.disconnected {
+  background: var(--muted);
+  opacity: 0.4;
+}
+
+#wallet-card.connected {
+  border-color: rgba(31, 122, 76, 0.35);
+  box-shadow: 0 0 0 3px rgba(31, 122, 76, 0.08), 0 18px 48px rgba(24, 33, 38, 0.08);
+}
+
 .empty-state {
   min-height: 180px;
   align-content: center;

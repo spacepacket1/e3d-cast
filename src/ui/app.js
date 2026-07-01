@@ -402,7 +402,14 @@
 
   function renderStatus() {
     const attemptsRemaining = Math.max(0, 3 - Number(state.freeSampleAttemptsUsed || 0));
-    els.walletDisplay.textContent = shortWallet(state.wallet);
+    const connected = !!state.wallet;
+    const dot = document.querySelector('#wallet-dot');
+    const walletCard = document.querySelector('#wallet-card');
+    if (dot) { dot.className = `wallet-dot ${connected ? 'connected' : 'disconnected'}`; }
+    if (walletCard) { walletCard.className = `status-card ${connected ? 'connected' : ''}`; }
+    els.walletDisplay.innerHTML = `<span id="wallet-dot" class="wallet-dot ${connected ? 'connected' : 'disconnected'}"></span>${shortWallet(state.wallet)}`;
+    els.connectWallet.textContent = connected ? `${state.wallet.slice(0, 6)}…` : 'Connect Wallet';
+    els.connectWallet.className = connected ? 'button primary' : 'button secondary';
     els.holderBadge.textContent = state.holderDiscountApplied ? '20% holder discount active' : 'Holder discount pending wallet quote';
     els.creditBalance.textContent = state.creditBalance == null ? 'No credit key' : `${state.creditBalance} credits`;
     els.creditKeyLabel.textContent = state.creditKey ? `Key ${state.creditKey.slice(0, 14)}...` : 'Add credits to unlock paid submission';
@@ -775,8 +782,15 @@ ${Object.keys(archive).length ? `\n${JSON.stringify(archive, null, 2)}` : '\nCon
   }
 
   async function connectWallet() {
+    if (state.wallet) {
+      state.wallet = '';
+      persistState();
+      renderStatus();
+      return;
+    }
     if (window.ethereum && window.ethereum.request) {
-      const accounts = await window.ethereum.request({ method: 'eth_requestAccounts' });
+      await window.ethereum.request({ method: 'wallet_requestPermissions', params: [{ eth_accounts: {} }] });
+      const accounts = await window.ethereum.request({ method: 'eth_accounts' });
       state.wallet = accounts[0] || '';
     } else {
       state.wallet = window.prompt('Enter a wallet address') || '';

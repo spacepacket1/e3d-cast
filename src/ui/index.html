@@ -3,15 +3,14 @@
   <head>
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
-    <title>Cast on E3D</title>
-    <link rel="stylesheet" href="/styles.css">
+    <title>Cast (powered by E3D)</title>
+    <link rel="stylesheet" href="/styles.css?v=5">
   </head>
   <body>
     <div class="page-shell">
       <header class="topbar">
         <div>
-          <p class="eyebrow">Hosted Workspace</p>
-          <h1>Cast on E3D</h1>
+          <h1>Cast <span class="powered-by">(powered by E3D)</span></h1>
           <p class="subhead">Paste a transcript, upload source media, or use a public sample. Quote first, spend credits once, track artifacts after.</p>
         </div>
         <div class="topbar-actions">
@@ -21,9 +20,9 @@
       </header>
 
       <section class="status-grid">
-        <article class="status-card">
+        <article id="wallet-card" class="status-card">
           <span class="label">Wallet</span>
-          <strong id="wallet-display">Not connected</strong>
+          <strong id="wallet-display"><span id="wallet-dot" class="wallet-dot disconnected"></span>Not connected</strong>
           <span id="holder-badge" class="badge muted">Holder discount unknown</span>
         </article>
         <article class="status-card">
@@ -186,6 +185,6 @@
       </section>
     </div>
 
-    <script src="/app.js"></script>
+    <script src="/app.js?v=5"></script>
   </body>
 </html>
