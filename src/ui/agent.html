@@ -1,0 +1,148 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Cast API &amp; Agent Docs</title>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="icon" type="image/png" sizes="32x32" href="/e3d_logo_32.png">
+    <link rel="stylesheet" href="/styles.css?v=7">
+    <style>
+      .agent-page { max-width: 860px; margin: 0 auto; padding: 40px 24px; }
+      .back-link { display: inline-block; margin-bottom: 28px; color: var(--muted); text-decoration: none; font-size: 0.9rem; }
+      .back-link:hover { color: var(--ink); }
+      .section-divider { border: none; border-top: 1px solid var(--line); margin: 32px 0; }
+      .endpoint-label { font-size: 0.78rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin: 0 0 8px; font-weight: 700; }
+      .method-badge { display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: 0.76rem; font-weight: 700; margin-right: 6px; vertical-align: middle; }
+      .method-get { background: rgba(31,122,76,0.12); color: var(--success); }
+      .method-post { background: rgba(191,74,43,0.12); color: var(--accent); }
+    </style>
+  </head>
+  <body>
+    <div class="agent-page">
+      <a href="/" class="back-link">← Back to Cast</a>
+      <h1><img src="/e3d_logo_200.png" alt="E3D" class="title-logo">Cast API <span class="powered-by">(powered by E3D)</span></h1>
+      <p class="subhead">Full curl reference, CLI usage, and agent integration guide for <strong>cast.e3d.ai</strong>.</p>
+
+      <hr class="section-divider">
+
+      <h2>Base URL</h2>
+      <pre>https://cast.e3d.ai</pre>
+
+      <h2>Authentication</h2>
+      <p>Paid endpoints require an E3D Cast credit key as a Bearer token:</p>
+      <pre>Authorization: Bearer e3d_cast_pay_&lt;key&gt;</pre>
+      <p>Purchase credits via the <a href="/">Cast UI</a> or the payments API.</p>
+
+      <hr class="section-divider">
+
+      <h2>Endpoints</h2>
+
+      <p class="endpoint-label"><span class="method-badge method-get">GET</span> Health</p>
+      <pre id="ex-health">curl -s https://cast.e3d.ai/api/cast/health</pre>
+
+      <p class="endpoint-label"><span class="method-badge method-get">GET</span> Capabilities</p>
+      <pre id="ex-capabilities">curl -s https://cast.e3d.ai/api/cast/capabilities</pre>
+
+      <p class="endpoint-label"><span class="method-badge method-post">POST</span> Quote a job</p>
+      <pre>curl -s -X POST https://cast.e3d.ai/api/cast/jobs/quote \
+  -H 'content-type: application/json' \
+  -d '{
+    "input": { "kind": "transcript", "text": "Host: Hello world\nGuest: Welcome to Cast." },
+    "preset": "transcript_short",
+    "tier": "starter"
+  }'</pre>
+
+      <p class="endpoint-label"><span class="method-badge method-post">POST</span> Submit a job</p>
+      <pre>curl -s -X POST https://cast.e3d.ai/api/cast/jobs \
+  -H 'Authorization: Bearer e3d_cast_pay_&lt;key&gt;' \
+  -H 'Idempotency-Key: my-job-001' \
+  -H 'content-type: application/json' \
+  -d '{
+    "input": { "kind": "transcript", "text": "Host: Hello world\nGuest: Welcome to Cast." },
+    "preset": "transcript_short",
+    "options": {
+      "dryRun": true,
+      "subtitleStyle": "bold_mobile",
+      "title": "My episode",
+      "madeWithCast": true
+    }
+  }'</pre>
+
+      <p class="endpoint-label"><span class="method-badge method-get">GET</span> Job status</p>
+      <pre>curl -s https://cast.e3d.ai/api/cast/jobs/&lt;jobId&gt; \
+  -H 'Authorization: Bearer e3d_cast_pay_&lt;key&gt;'</pre>
+
+      <p class="endpoint-label"><span class="method-badge method-get">GET</span> Artifacts</p>
+      <pre>curl -s https://cast.e3d.ai/api/cast/jobs/&lt;jobId&gt;/artifacts \
+  -H 'Authorization: Bearer e3d_cast_pay_&lt;key&gt;'</pre>
+
+      <p class="endpoint-label"><span class="method-badge method-post">POST</span> Cancel a job</p>
+      <pre>curl -s -X POST https://cast.e3d.ai/api/cast/jobs/&lt;jobId&gt;/cancel \
+  -H 'Authorization: Bearer e3d_cast_pay_&lt;key&gt;'</pre>
+
+      <p class="endpoint-label"><span class="method-badge method-post">POST</span> Revise a job</p>
+      <pre>curl -s -X POST https://cast.e3d.ai/api/cast/jobs/&lt;jobId&gt;/revise \
+  -H 'Authorization: Bearer e3d_cast_pay_&lt;key&gt;' \
+  -H 'Idempotency-Key: revision-001' \
+  -H 'content-type: application/json' \
+  -d '{ "revisionType": "subtitle_style", "options": { "subtitleStyle": "clean_podcast" } }'</pre>
+
+      <p class="endpoint-label"><span class="method-badge method-post">POST</span> Archive to IPFS</p>
+      <pre>curl -s -X POST https://cast.e3d.ai/api/cast/jobs/&lt;jobId&gt;/archive-ipfs \
+  -H 'Authorization: Bearer e3d_cast_pay_&lt;key&gt;' \
+  -H 'content-type: application/json' \
+  -d '{ "consent": true, "include": ["video","thumbnail","captions","manifest"] }'</pre>
+
+      <hr class="section-divider">
+
+      <h2>Credit balance</h2>
+      <pre>curl -s 'https://cast.e3d.ai/api/payments/credits/balance?product=cast' \
+  -H 'Authorization: Bearer e3d_cast_pay_&lt;key&gt;'</pre>
+
+      <hr class="section-divider">
+
+      <h2>e3d-agent CLI</h2>
+      <pre>e3d-agent cast render \
+  --preset transcript_short \
+  --dry-run \
+  --webhook https://your-server.com/hooks/cast</pre>
+
+      <hr class="section-divider">
+
+      <h2>OpenAPI spec</h2>
+      <pre id="ex-openapi">curl -s https://cast.e3d.ai/openapi/e3d-cast.yaml</pre>
+
+      <h2>LLMs.txt</h2>
+      <pre>curl -s https://cast.e3d.ai/llms.txt</pre>
+
+      <h2>Agent capabilities</h2>
+      <pre>curl -s https://cast.e3d.ai/.well-known/agent-capabilities.json</pre>
+
+      <hr class="section-divider">
+
+      <div id="live-capabilities" class="panel" style="margin-top:0"></div>
+    </div>
+
+    <script>
+      (function () {
+        fetch('/api/cast/capabilities')
+          .then((r) => r.json())
+          .then((caps) => {
+            const el = document.querySelector('#live-capabilities');
+            el.innerHTML = `
+              <div class="panel-header"><div><p class="eyebrow">Live data</p><h2>Current capabilities</h2></div></div>
+              <div class="chip-row">
+                ${caps.presets.map((p) => `<span class="chip">${p}</span>`).join('')}
+              </div>
+              <div class="chip-row" style="margin-top:8px">
+                ${caps.tiers.map((t) => `<span class="chip">${t.id}: ${t.freeAttempts} free · ${t.maxTranscriptChars.toLocaleString()} chars</span>`).join('')}
+              </div>
+              <p class="small" style="margin:12px 0 0">Status: ${caps.status} · Version: ${caps.version}</p>
+            `;
+          })
+          .catch(() => {});
+      }());
+    </script>
+  </body>
+</html>

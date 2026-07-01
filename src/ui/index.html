@@ -4,15 +4,18 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Cast (powered by E3D)</title>
-    <link rel="stylesheet" href="/styles.css?v=5">
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="icon" type="image/png" sizes="32x32" href="/e3d_logo_32.png">
+    <link rel="stylesheet" href="/styles.css?v=7">
   </head>
   <body>
     <div class="page-shell">
       <header class="topbar">
-        <div>
-          <h1>Cast <span class="powered-by">(powered by E3D)</span></h1>
+        <div class="topbar-title">
+          <h1><img src="/e3d_logo_200.png" alt="E3D" class="title-logo">Cast <span class="powered-by">(powered by E3D)</span></h1>
           <p class="subhead">Paste a transcript, upload source media, or use a public sample. Quote first, spend credits once, track artifacts after.</p>
         </div>
+        <a href="/agent.html" target="_blank" rel="noreferrer" class="topbar-api-link">API</a>
         <div class="topbar-actions">
           <button id="connect-wallet" class="button secondary">Connect Wallet</button>
           <a id="get-e3d-link" class="button ghost" target="_blank" rel="noreferrer">Get E3D</a>
@@ -23,6 +26,7 @@
         <article id="wallet-card" class="status-card">
           <span class="label">Wallet</span>
           <strong id="wallet-display"><span id="wallet-dot" class="wallet-dot disconnected"></span>Not connected</strong>
+          <span id="token-balances" class="small token-balances"></span>
           <span id="holder-badge" class="badge muted">Holder discount unknown</span>
         </article>
         <article class="status-card">
@@ -123,6 +127,7 @@
                 <p class="eyebrow">Payments</p>
                 <h2>Buy or refresh credits</h2>
               </div>
+              <button id="payments-info" class="info-btn" title="About payment methods" aria-label="Payment method info">ℹ</button>
             </div>
             <div class="payment-controls">
               <input id="credit-request" class="text-input" type="number" min="100" step="100" value="1000">
@@ -172,19 +177,21 @@
           </div>
           <div id="job-detail" class="job-detail empty-state">Submit a dry-run or free sample render to inspect artifacts, archive options, and revision actions.</div>
         </section>
-
-        <section class="panel">
-          <div class="panel-header">
-            <div>
-              <p class="eyebrow">Agent Mode</p>
-              <h2>CLI and API examples</h2>
-            </div>
-          </div>
-          <div id="agent-mode" class="agent-mode"></div>
-        </section>
       </section>
     </div>
 
-    <script src="/app.js?v=5"></script>
+    <!-- Payments info dialog -->
+    <dialog id="payments-info-dialog">
+      <div class="dialog-body">
+        <button id="dialog-close" class="dialog-close" aria-label="Close">✕</button>
+        <h3>Ethereum E3D vs Base wE3D</h3>
+        <p><strong>Ethereum E3D</strong> (ticker: E3D) is the native token on Ethereum mainnet. Send E3D directly from your Ethereum wallet to purchase Cast credits in one transaction.</p>
+        <p><strong>Base wE3D</strong> is wrapped E3D bridged to Base. It settles faster and costs less gas, making it the preferred option for agent automation and frequent API payments.</p>
+        <p>Both tokens share the same credit rate: <strong>1 E3D = 1,000 credits</strong>. Credits are non-custodial — they are spent per job at submission time.</p>
+        <a href="https://cast.e3d.ai/docs/payments" target="_blank" rel="noreferrer" class="button primary">Full payment docs ↗</a>
+      </div>
+    </dialog>
+
+    <script src="/app.js?v=7"></script>
   </body>
 </html>

@@ -2,6 +2,10 @@
 
 (function () {
   const STORAGE_KEY = 'cast-ui-state-v1';
+  const E3D_ETH_ADDRESS = '0x6488861b401F427D13B6619C77C297366bCf6386';
+  const WE3D_BASE_ADDRESS = '0xDFC9E32Dd0542D12c08ED15FEfadBAe8071B48A5';
+  const ETH_RPC = 'https://cloudflare-eth.com';
+  const BASE_RPC = 'https://mainnet.base.org';
   const modes = [
     { id: 'upload', label: 'Upload', copy: 'Choose a local media file and register it with the service upload helper.' },
     { id: 'url', label: 'Source URL', copy: 'Quote and dispatch a hosted fetch from a public media URL.' },
@@ -98,7 +102,10 @@
     sampleGallery: document.querySelector('#sample-gallery'),
     jobsList: document.querySelector('#jobs-list'),
     jobDetail: document.querySelector('#job-detail'),
-    agentMode: document.querySelector('#agent-mode'),
+    tokenBalances: document.querySelector('#token-balances'),
+    paymentsInfo: document.querySelector('#payments-info'),
+    paymentsInfoDialog: document.querySelector('#payments-info-dialog'),
+    dialogClose: document.querySelector('#dialog-close'),
   };
 
   const state = Object.assign({
@@ -253,6 +260,44 @@
       reader.onerror = reject;
       reader.readAsDataURL(file);
     });
+  }
+
+  async function fetchErc20Balance(rpcUrl, contractAddress, walletAddress) {
+    try {
+      const data = '0x70a08231' + walletAddress.slice(2).toLowerCase().padStart(64, '0');
+      const resp = await fetch(rpcUrl, {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ jsonrpc: '2.0', id: 1, method: 'eth_call', params: [{ to: contractAddress, data }, 'latest'] }),
+      });
+      const { result } = await resp.json();
+      if (!result || result === '0x') return 0;
+      const raw = BigInt(result);
+      const whole = raw / BigInt('1000000000000000000');
+      const frac = (raw % BigInt('1000000000000000000')) / BigInt('10000000000000000');
+      return Number(whole) + Number(frac) / 100;
+    } catch (_err) {
+      return null;
+    }
+  }
+
+  async function fetchTokenBalances() {
+    if (!state.wallet || !els.tokenBalances) return;
+    els.tokenBalances.textContent = 'Loading balances…';
+    const [e3d, we3d] = await Promise.all([
+      fetchErc20Balance(ETH_RPC, E3D_ETH_ADDRESS, state.wallet),
+      fetchErc20Balance(BASE_RPC, WE3D_BASE_ADDRESS, state.wallet),
+    ]);
+    state.tokenBalances = { e3d, we3d };
+    renderTokenBalances();
+  }
+
+  function renderTokenBalances() {
+    if (!els.tokenBalances) return;
+    if (!state.wallet) { els.tokenBalances.textContent = ''; return; }
+    const fmt = (v) => v == null ? '—' : v.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 4 });
+    const tb = state.tokenBalances || {};
+    els.tokenBalances.innerHTML = `E3D&nbsp;<strong>${fmt(tb.e3d)}</strong>&ensp;·&ensp;Base wE3D&nbsp;<strong>${fmt(tb.we3d)}</strong>`;
   }
 
   function renderModeTabs() {
@@ -784,8 +829,10 @@ ${Object.keys(archive).length ? `\n${JSON.stringify(archive, null, 2)}` : '\nCon
   async function connectWallet() {
     if (state.wallet) {
       state.wallet = '';
+      state.tokenBalances = null;
       persistState();
       renderStatus();
+      renderTokenBalances();
       return;
     }
     if (window.ethereum && window.ethereum.request) {
@@ -797,6 +844,7 @@ ${Object.keys(archive).length ? `\n${JSON.stringify(archive, null, 2)}` : '\nCon
     }
     persistState();
     renderStatus();
+    fetchTokenBalances();
   }
 
   async function init() {
@@ -817,6 +865,9 @@ ${Object.keys(archive).length ? `\n${JSON.stringify(archive, null, 2)}` : '\nCon
     els.refreshBalance.addEventListener('click', refreshBalance);
     els.submitJob.addEventListener('click', submitPaidJob);
     els.tryFreeRender.addEventListener('click', createLocalSampleJob);
+    els.paymentsInfo.addEventListener('click', () => els.paymentsInfoDialog.showModal());
+    els.dialogClose.addEventListener('click', () => els.paymentsInfoDialog.close());
+    els.paymentsInfoDialog.addEventListener('click', (e) => { if (e.target === els.paymentsInfoDialog) els.paymentsInfoDialog.close(); });
     els.titleInput.addEventListener('input', (event) => { state.title = event.target.value; persistState(); renderPreview(); renderAgentMode(); });
     els.descriptionInput.addEventListener('input', (event) => { state.description = event.target.value; persistState(); renderPreview(); });
     els.tagsInput.addEventListener('input', (event) => { state.tags = event.target.value; persistState(); });
@@ -831,6 +882,7 @@ ${Object.keys(archive).length ? `\n${JSON.stringify(archive, null, 2)}` : '\nCon
         state.creditBalance = null;
       }
     }
+    if (state.wallet) fetchTokenBalances();
     if (state.selectedJobId) {
       const job = selectedJob();
       if (job && job.kind !== 'local-sample' && state.creditKey) {
@@ -857,7 +909,7 @@ ${Object.keys(archive).length ? `\n${JSON.stringify(archive, null, 2)}` : '\nCon
     renderSamples();
     renderJobs();
     renderJobDetail();
-    renderAgentMode();
+    renderTokenBalances();
     persistState();
   }
 
