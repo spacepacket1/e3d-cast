@@ -188,6 +188,16 @@ function serveFile(res, filePath) {
   }
   res.statusCode = 200;
   res.setHeader('content-type', contentTypeFor(filePath));
+  // index.html/gallery.html/etc. reference app.js/styles.css by a
+  // content-hashed ?v= query string, so *those* are safe to cache far in
+  // the future -- but the HTML shell itself was being served with no
+  // cache-control at all, leaving each browser's own (inconsistent,
+  // sometimes surprisingly sticky) heuristic caching in charge of when a
+  // deploy actually became visible. Explicit no-cache forces revalidation
+  // on every load instead.
+  if (path.extname(filePath).toLowerCase() === '.html') {
+    res.setHeader('cache-control', 'no-cache');
+  }
   res.end(fs.readFileSync(filePath));
 }
 

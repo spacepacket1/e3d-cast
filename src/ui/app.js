@@ -122,7 +122,6 @@
     paymentMethod: document.querySelector('#payment-method'),
     registerPurchase: document.querySelector('#register-purchase'),
     refreshBalance: document.querySelector('#refresh-balance'),
-    sampleGallery: document.querySelector('#sample-gallery'),
     jobsList: document.querySelector('#jobs-list'),
     loadWalletJobs: document.querySelector('#load-wallet-jobs'),
     jobDetail: document.querySelector('#job-detail'),
@@ -675,22 +674,6 @@
       <span>Burn amount: ${state.purchaseQuote.burnAmount}</span>
       <span>Payment options: ${methods}</span>
     `;
-  }
-
-  function renderSamples() {
-    els.sampleGallery.innerHTML = samples.map((sample) => `
-      <article class="sample-card">
-        <img src="${samplePoster(sample)}" alt="${sample.title}">
-        <strong>${sample.title}</strong>
-        <p>${sample.description}</p>
-        <div class="chip-row">
-          <span class="chip">${sample.inputKind}</span>
-          <span class="chip">${sample.preset}</span>
-          <span class="chip">${sample.aspect}</span>
-        </div>
-        <p class="small">${sample.outputSummary}</p>
-      </article>
-    `).join('');
   }
 
   function renderJobs() {
@@ -1393,7 +1376,6 @@ ${Object.keys(archive).length ? `\n${JSON.stringify(archive, null, 2)}` : '\nCon
     renderPreview();
     renderQuotePanel();
     renderPurchaseQuote();
-    renderSamples();
     renderJobs();
     renderJobDetail();
     renderTokenBalances();
