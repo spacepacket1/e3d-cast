@@ -141,36 +141,44 @@
     dialogClose: document.querySelector('#dialog-close'),
   };
 
-  const state = Object.assign({
-    config: null,
-    capabilities: null,
-    wallet: '',
-    creditKey: '',
-    creditBalance: null,
-    holderDiscountApplied: false,
-    workspaceMode: 'basic',
-    mode: 'transcript',
-    preset: 'transcript_short',
-    subtitleStyle: 'bold_mobile',
-    transcriptText: 'Host: Welcome to Cast.\nGuest: Today we are previewing a hosted render on E3D.',
-    sourceUrl: '',
-    upload: null,
-    uploadBusy: false,
-    uploadError: '',
-    uploadProgress: 0,
-    selectedSampleId: samples[0].id,
-    title: 'Cast transcript short',
-    description: 'Preview subtitle style, watermark state, metadata, and pricing before spend.',
-    tags: 'cast,e3d,transcript',
-    archiveToIpfs: false,
-    brandEndCard: true,
-    madeWithCast: true,
-    freeSampleAttemptsUsed: 0,
-    quote: null,
-    purchaseQuote: null,
-    jobs: [],
-    selectedJobId: '',
-  }, loadState());
+  // Shared by the initial state and by disconnectWallet()'s reset, so a
+  // fresh default and "back to defaults after disconnect" can never drift
+  // apart. workspaceMode is deliberately absent -- it's a UI preference
+  // ("how do I want to use this app"), not wallet/session content, so
+  // disconnecting shouldn't flip it back to Basic.
+  function createDefaultState() {
+    return {
+      config: null,
+      capabilities: null,
+      wallet: '',
+      creditKey: '',
+      creditBalance: null,
+      holderDiscountApplied: false,
+      mode: 'transcript',
+      preset: 'transcript_short',
+      subtitleStyle: 'bold_mobile',
+      transcriptText: 'Host: Welcome to Cast.\nGuest: Today we are previewing a hosted render on E3D.',
+      sourceUrl: '',
+      upload: null,
+      uploadBusy: false,
+      uploadError: '',
+      uploadProgress: 0,
+      selectedSampleId: samples[0].id,
+      title: 'Cast transcript short',
+      description: 'Preview subtitle style, watermark state, metadata, and pricing before spend.',
+      tags: 'cast,e3d,transcript',
+      archiveToIpfs: false,
+      brandEndCard: true,
+      madeWithCast: true,
+      freeSampleAttemptsUsed: 0,
+      quote: null,
+      purchaseQuote: null,
+      jobs: [],
+      selectedJobId: '',
+    };
+  }
+
+  const state = Object.assign(createDefaultState(), { workspaceMode: 'basic' }, loadState());
 
   function loadState() {
     try {
@@ -626,6 +634,18 @@
         renderStyleGrid();
       });
     });
+  }
+
+  function renderPlatformMetadataInputs() {
+    // Same staleness class as the brand-kit checkboxes above: these were
+    // only ever synced once at init(), so disconnectWallet()'s reset (or
+    // any other programmatic state change) wouldn't show up here. Safe to
+    // re-sync on every render() -- the title/description/tags "input"
+    // listeners only call persistState(), never render(), so this can't
+    // clobber what someone is actively typing.
+    els.titleInput.value = state.title;
+    els.descriptionInput.value = state.description;
+    els.tagsInput.value = state.tags;
   }
 
   function renderBrandKitCopy() {
@@ -1314,15 +1334,25 @@ ${Object.keys(archive).length ? `\n${JSON.stringify(archive, null, 2)}` : '\nCon
     renderJobDetail();
   }
 
+  async function disconnectWallet() {
+    // Credit key, jobs, and every creation-form field are either
+    // wallet-specific (credit key, job history) or just leftover scratch
+    // state from the last session -- carrying them over to whatever
+    // wallet connects next showed a confusing mix of two people's data.
+    // workspaceMode is the one exception (see createDefaultState) --
+    // that's a UI preference, not session content.
+    Object.assign(state, createDefaultState(), { workspaceMode: state.workspaceMode });
+    state.tokenBalances = null;
+    walletProof = null;
+    // Not part of `state` (read directly from the DOM at submit time) but
+    // still a payment tx hash tied to whoever was just connected.
+    els.txHash.value = '';
+    persistState();
+    render();
+  }
+
   async function connectWallet() {
-    if (state.wallet) {
-      state.wallet = '';
-      state.tokenBalances = null;
-      persistState();
-      renderStatus();
-      renderTokenBalances();
-      return;
-    }
+    if (state.wallet) return disconnectWallet();
     if (window.ethereum && window.ethereum.request) {
       await window.ethereum.request({ method: 'wallet_requestPermissions', params: [{ eth_accounts: {} }] });
       const accounts = await window.ethereum.request({ method: 'eth_accounts' });
@@ -1331,17 +1361,22 @@ ${Object.keys(archive).length ? `\n${JSON.stringify(archive, null, 2)}` : '\nCon
       state.wallet = window.prompt('Enter a wallet address') || '';
     }
     persistState();
-    renderStatus();
+    render();
     fetchTokenBalances();
+    if (state.wallet) {
+      // Best-effort: reload this wallet's job history automatically, same
+      // as clicking "Load my jobs". Silent on failure/rejection (e.g. no
+      // injected wallet to sign with, or the user dismisses the signature
+      // prompt) -- connecting still succeeds either way, and "Load my
+      // jobs" remains available to retry by hand.
+      loadJobsForWallet().catch(() => {});
+    }
   }
 
   async function init() {
     state.config = await apiJson('/ui-api/config');
     state.capabilities = await apiJson('/api/cast/capabilities');
     els.getE3dLink.href = state.config.getE3dUrl;
-    els.titleInput.value = state.title;
-    els.descriptionInput.value = state.description;
-    els.tagsInput.value = state.tags;
 
     els.workspaceModeToggle.querySelectorAll('[data-workspace-mode]').forEach((button) => {
       button.addEventListener('click', () => {
@@ -1411,6 +1446,7 @@ ${Object.keys(archive).length ? `\n${JSON.stringify(archive, null, 2)}` : '\nCon
     renderPresetGrid();
     renderStyleGrid();
     renderStatus();
+    renderPlatformMetadataInputs();
     renderBrandKitCopy();
     renderQuotePanel();
     renderPurchaseQuote();
