@@ -102,11 +102,6 @@
     brandEndCard: document.querySelector('#brand-end-card'),
     madeWithToggle: document.querySelector('#made-with-toggle'),
     archiveToggle: document.querySelector('#archive-toggle'),
-    previewAspect: document.querySelector('#preview-aspect'),
-    previewCaption: document.querySelector('#preview-caption'),
-    previewWatermark: document.querySelector('#preview-watermark'),
-    previewTitle: document.querySelector('#preview-title'),
-    previewDescription: document.querySelector('#preview-description'),
     watermarkCopy: document.querySelector('#watermark-copy'),
     rebateCopy: document.querySelector('#rebate-copy'),
     submitState: document.querySelector('#submit-state'),
@@ -560,7 +555,6 @@
     document.querySelector('#transcript-input').addEventListener('input', (event) => {
       state.transcriptText = event.target.value;
       persistState();
-      renderPreview();
       renderInputPanel();
     });
   }
@@ -592,20 +586,13 @@
       button.addEventListener('click', () => {
         state.subtitleStyle = button.dataset.style;
         persistState();
-        renderPreview();
         renderStyleGrid();
       });
     });
   }
 
-  function renderPreview() {
-    const preset = presets.find((entry) => entry.id === state.preset) || presets[0];
+  function renderBrandKitCopy() {
     const watermarkOn = currentTier() === 'free' || state.mode === 'sample';
-    els.previewAspect.textContent = preset.aspect;
-    els.previewCaption.textContent = `${styles.find((entry) => entry.id === state.subtitleStyle).title} captions preview`;
-    els.previewWatermark.textContent = watermarkOn ? 'cast.e3d.ai' : 'Made with Cast';
-    els.previewTitle.textContent = state.title || 'Cast preview title';
-    els.previewDescription.textContent = state.description || 'Description preview';
     els.watermarkCopy.textContent = watermarkOn
       ? 'Free/sample renders show the Cast watermark and a 24-hour retention window.'
       : 'Paid tiers remove the watermark. End card stays on by default for a small rebate.';
@@ -1338,11 +1325,11 @@ ${Object.keys(archive).length ? `\n${JSON.stringify(archive, null, 2)}` : '\nCon
     els.paymentsInfo.addEventListener('click', () => els.paymentsInfoDialog.showModal());
     els.dialogClose.addEventListener('click', () => els.paymentsInfoDialog.close());
     els.paymentsInfoDialog.addEventListener('click', (e) => { if (e.target === els.paymentsInfoDialog) els.paymentsInfoDialog.close(); });
-    els.titleInput.addEventListener('input', (event) => { state.title = event.target.value; persistState(); renderPreview(); });
-    els.descriptionInput.addEventListener('input', (event) => { state.description = event.target.value; persistState(); renderPreview(); });
+    els.titleInput.addEventListener('input', (event) => { state.title = event.target.value; persistState(); });
+    els.descriptionInput.addEventListener('input', (event) => { state.description = event.target.value; persistState(); });
     els.tagsInput.addEventListener('input', (event) => { state.tags = event.target.value; persistState(); });
-    els.brandEndCard.addEventListener('change', (event) => { state.brandEndCard = event.target.checked; persistState(); renderPreview(); });
-    els.madeWithToggle.addEventListener('change', (event) => { state.madeWithCast = event.target.checked; persistState(); renderPreview(); });
+    els.brandEndCard.addEventListener('change', (event) => { state.brandEndCard = event.target.checked; persistState(); });
+    els.madeWithToggle.addEventListener('change', (event) => { state.madeWithCast = event.target.checked; persistState(); renderBrandKitCopy(); });
     els.archiveToggle.addEventListener('change', (event) => { state.archiveToIpfs = event.target.checked; persistState(); });
 
     if (state.creditKey) {
@@ -1373,7 +1360,7 @@ ${Object.keys(archive).length ? `\n${JSON.stringify(archive, null, 2)}` : '\nCon
     renderPresetGrid();
     renderStyleGrid();
     renderStatus();
-    renderPreview();
+    renderBrandKitCopy();
     renderQuotePanel();
     renderPurchaseQuote();
     renderJobs();

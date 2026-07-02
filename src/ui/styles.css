@@ -208,6 +208,16 @@ h2 {
   margin: 18px 0;
 }
 
+/* Space the "Output preset" block from the input-mode panel above it, and
+   the "Platform metadata" block from the caption/brand-kit row above it --
+   scoped to these two spots rather than a blanket .section-block margin,
+   since .section-block is also used nested inside .two-column grids where
+   extra margin isn't wanted. */
+#input-mode-panel + .section-block,
+.two-column + .section-block {
+  margin-top: 18px;
+}
+
 .preset-grid {
   grid-template-columns: repeat(4, minmax(0, 1fr));
 }
@@ -324,48 +334,6 @@ h2 {
 
 .mono {
   font-family: var(--mono);
-}
-
-.preview-frame {
-  background: linear-gradient(135deg, rgba(24, 33, 38, 0.96), rgba(46, 69, 85, 0.96));
-  color: #fff;
-  border-radius: 24px;
-  overflow: hidden;
-}
-
-.preview-video {
-  aspect-ratio: 9 / 16;
-  padding: 18px;
-  position: relative;
-  background:
-    radial-gradient(circle at 20% 20%, rgba(191, 74, 43, 0.7), transparent 34%),
-    radial-gradient(circle at 80% 18%, rgba(255, 255, 255, 0.18), transparent 22%),
-    linear-gradient(180deg, rgba(255, 255, 255, 0.04), rgba(24, 33, 38, 0.4));
-}
-
-.preview-caption {
-  position: absolute;
-  left: 18px;
-  right: 18px;
-  bottom: 54px;
-  background: rgba(255, 255, 255, 0.92);
-  color: #000;
-  padding: 10px 12px;
-  border-radius: 12px;
-  font-weight: 700;
-}
-
-.preview-watermark {
-  position: absolute;
-  right: 16px;
-  bottom: 16px;
-  font-size: 0.78rem;
-  opacity: 0.9;
-}
-
-.preview-meta {
-  padding: 16px;
-  background: rgba(0, 0, 0, 0.2);
 }
 
 .sample-card,
