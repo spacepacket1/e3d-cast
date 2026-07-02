@@ -128,19 +128,17 @@ async function handleUpload(req, res, options) {
 }
 
 async function forwardServiceCall(req, res, targetBaseUrl, serviceToken) {
-  if (!serviceToken) {
-    return json(res, 503, {
-      error: 'SPACEPACKET_SERVICE_BEARER_TOKEN is not configured',
-      code: 'SERVICE_TOKEN_MISSING',
-    });
-  }
+  // The service token is only used to attribute agent-tier pricing upstream
+  // (see productPaymentsRoutes.js handleQuoteCredits/handlePurchaseCredits,
+  // which treat it as optional). Wallet purchase quoting/registration works
+  // without it, so a missing token must not block those routes entirely.
   const routePath = req.url.replace(/^\/ui-api/, '/api');
   const target = new URL(routePath, targetBaseUrl);
   const body = await readBody(req);
   const response = await fetch(target, {
     method: req.method,
     headers: proxyHeaders(req.headers, {
-      authorization: `Bearer ${serviceToken}`,
+      ...(serviceToken ? { authorization: `Bearer ${serviceToken}` } : {}),
       'content-type': req.headers['content-type'] || 'application/json',
     }),
     body,
