@@ -669,16 +669,16 @@
       return;
     }
     els.jobsList.innerHTML = state.jobs.map((job) => `
-      <article class="job-card">
+      <button class="job-row ${job.jobId === state.selectedJobId ? 'active' : ''}" data-job="${job.jobId}">
         <strong>${job.title || job.jobId}</strong>
-        <p>${job.status} • ${job.tier || 'free'} • ${job.source || job.inputKind}</p>
-        <button class="button ghost" data-job="${job.jobId}">Open</button>
-      </article>
+        <span class="small">${job.status} • ${job.tier || 'free'} • ${job.source || job.inputKind}</span>
+      </button>
     `).join('');
     els.jobsList.querySelectorAll('[data-job]').forEach((button) => {
       button.addEventListener('click', async () => {
         state.selectedJobId = button.dataset.job;
         persistState();
+        renderJobs();
         const job = selectedJob();
         if (job && job.kind !== 'local-sample' && !job.remoteStatus && (state.creditKey || walletProofIsFresh())) {
           try {

@@ -203,6 +203,10 @@ h2 {
   gap: 12px;
 }
 
+.jobs-list {
+  gap: 6px;
+}
+
 .two-column {
   grid-template-columns: repeat(2, minmax(0, 1fr));
   margin: 18px 0;
@@ -235,7 +239,7 @@ h2 {
 .text-input,
 .text-area,
 .sample-card,
-.job-card,
+.job-row,
 .artifact-card,
 .code-card,
 .mode-button,
@@ -286,7 +290,8 @@ h2 {
 
 .mode-button.active,
 .preset-card.active,
-.style-card.active {
+.style-card.active,
+.job-row.active {
   border-color: var(--accent);
   box-shadow: inset 0 0 0 2px rgba(191, 74, 43, 0.25);
 }
@@ -337,11 +342,45 @@ h2 {
 }
 
 .sample-card,
-.job-card,
 .artifact-card,
 .code-card {
   background: rgba(255, 255, 255, 0.82);
   padding: 14px;
+}
+
+.job-row {
+  background: rgba(255, 255, 255, 0.82);
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
+  padding: 10px 14px;
+  text-align: left;
+  font: inherit;
+  cursor: pointer;
+  overflow: hidden;
+}
+
+.job-row strong,
+.job-row span {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.job-row strong {
+  flex: 1 1 auto;
+  min-width: 0;
+}
+
+.job-row span {
+  flex: 0 1 auto;
+  color: var(--muted);
+}
+
+.job-row:hover {
+  border-color: var(--accent);
 }
 
 .sample-card img {
