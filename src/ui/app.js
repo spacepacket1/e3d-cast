@@ -910,8 +910,20 @@ ${Object.keys(archive).length ? `\n${JSON.stringify(archive, null, 2)}` : '\nCon
 
   async function autoFundAndCreateVideo() {
     if (!state.wallet) {
-      await connectWallet();
-      if (!state.wallet) return;
+      try {
+        await connectWallet();
+      } catch (error) {
+        els.quoteStatus.textContent = 'Create video failed';
+        els.quotePanel.innerHTML = `<div class="manifest-box">${error.message || 'Wallet connection was rejected or failed.'}</div>`;
+        els.quotePanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        return;
+      }
+      if (!state.wallet) {
+        els.quoteStatus.textContent = 'Create video failed';
+        els.quotePanel.innerHTML = '<div class="manifest-box">Connect a wallet to create a video.</div>';
+        els.quotePanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+        return;
+      }
     }
     const issue = inputReadinessIssue();
     if (issue) {
