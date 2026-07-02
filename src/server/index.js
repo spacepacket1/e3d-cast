@@ -73,13 +73,30 @@ function ensureDir(dirPath) {
   fs.mkdirSync(dirPath, { recursive: true });
 }
 
-// Headers describing the browser's own request context. This proxy call is a
-// trusted server-to-server hop, not the cross-origin browser request itself —
-// forwarding the browser's Origin verbatim trips the upstream API's strict
-// CORS allowlist (it doesn't include cast.e3d.ai) and turns into a 500 for
-// every real browser client, even though curl/server-to-server calls (no
-// Origin header) pass fine.
-const DROPPED_PROXY_HEADERS = new Set(['host', 'origin']);
+// Headers describing the browser's own request context, plus the standard
+// hop-by-hop headers (RFC 7230 6.1) that only apply to one leg of a proxy
+// chain. This proxy call is a trusted server-to-server hop, not the original
+// browser request — forwarding it verbatim causes real breakage upstream:
+// - origin: trips the upstream API's strict CORS allowlist (it doesn't
+//   include cast.e3d.ai), turning into a 500 for every real browser client.
+// - connection/upgrade: production nginx unconditionally sends
+//   "Connection: upgrade" on this location block (websocket-support
+//   boilerplate applied to a plain HTTP proxy). Relayed as-is to the
+//   upstream fetch(), the upstream API hangs trying to negotiate a
+//   protocol upgrade nobody asked for, and /ui-api/payments/credits/*
+//   times out behind nginx even though it answers instantly over loopback.
+const DROPPED_PROXY_HEADERS = new Set([
+  'host',
+  'origin',
+  'connection',
+  'upgrade',
+  'keep-alive',
+  'proxy-authenticate',
+  'proxy-authorization',
+  'te',
+  'trailer',
+  'transfer-encoding',
+]);
 
 function proxyHeaders(reqHeaders, extraHeaders = {}) {
   const headers = { ...extraHeaders };
