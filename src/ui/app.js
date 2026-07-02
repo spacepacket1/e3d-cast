@@ -1165,7 +1165,7 @@ ${Object.keys(archive).length ? `\n${JSON.stringify(archive, null, 2)}` : '\nCon
     els.quotePurchase.addEventListener('click', quotePurchase);
     els.registerPurchase.addEventListener('click', registerPurchase);
     els.refreshBalance.addEventListener('click', refreshBalance);
-    els.submitJob.addEventListener('click', submitPaidJob);
+    els.submitJob.addEventListener('click', () => submitPaidJob());
     els.tryFreeRender.addEventListener('click', createLocalSampleJob);
     els.paymentsInfo.addEventListener('click', () => els.paymentsInfoDialog.showModal());
     els.dialogClose.addEventListener('click', () => els.paymentsInfoDialog.close());
