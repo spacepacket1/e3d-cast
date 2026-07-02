@@ -797,19 +797,36 @@ ${Object.keys(archive).length ? `\n${JSON.stringify(archive, null, 2)}` : '\nCon
   }
 
   async function registerPurchase() {
-    const purchase = await apiJson('/ui-api/payments/credits/purchase', {
-      method: 'POST',
-      headers: { 'content-type': 'application/json' },
-      body: JSON.stringify({
-        product: 'cast',
-        wallet: state.wallet,
-        txHash: els.txHash.value.trim(),
-        paymentMethod: els.paymentMethod.value,
-      }),
-    });
-    state.creditKey = purchase.creditKey;
-    persistState();
-    await refreshBalance();
+    const txHash = els.txHash.value.trim();
+    if (!txHash) {
+      els.purchaseQuote.innerHTML = '<span class="small">Enter a transaction hash first.</span>';
+      return;
+    }
+    els.registerPurchase.disabled = true;
+    els.purchaseQuote.innerHTML = '<span class="small">Registering purchase…</span>';
+    try {
+      const purchase = await registerPurchaseWithRetry(
+        {
+          product: 'cast',
+          wallet: state.wallet,
+          txHash,
+          paymentMethod: els.paymentMethod.value,
+        },
+        {
+          onProgress: ({ attempt, maxAttempts, elapsedLabel }) => {
+            els.purchaseQuote.innerHTML = `<span class="small">Waiting for transaction to confirm on-chain… (${elapsedLabel} elapsed, attempt ${attempt}/${maxAttempts}). This can take several minutes depending on network congestion — no need to resubmit.</span>`;
+          },
+        },
+      );
+      state.creditKey = purchase.creditKey;
+      persistState();
+      await refreshBalance();
+      els.purchaseQuote.innerHTML = `<span class="small">Purchase registered — ${purchase.issuedCredits} credits added.</span>`;
+    } catch (error) {
+      els.purchaseQuote.innerHTML = `<div class="manifest-box">${(error.payload && JSON.stringify(error.payload, null, 2)) || error.message}</div>`;
+    } finally {
+      els.registerPurchase.disabled = false;
+    }
   }
 
   async function refreshBalance() {
@@ -888,9 +905,22 @@ ${Object.keys(archive).length ? `\n${JSON.stringify(archive, null, 2)}` : '\nCon
     });
   }
 
-  async function registerPurchaseWithRetry(payload) {
-    const maxAttempts = 30;
-    const delayMs = 4000;
+  function formatElapsed(ms) {
+    const totalSeconds = Math.round(ms / 1000);
+    const minutes = Math.floor(totalSeconds / 60);
+    const seconds = totalSeconds % 60;
+    return `${minutes}:${String(seconds).padStart(2, '0')}`;
+  }
+
+  // Real on-chain transactions can take several minutes to be picked up by
+  // the indexer, especially under network congestion or low gas — 30
+  // attempts at 4s (2 minutes total) was routinely too short and left users
+  // watching a static, easy-to-miss status line with no sense of progress.
+  async function registerPurchaseWithRetry(payload, options = {}) {
+    const maxAttempts = options.maxAttempts || 90;
+    const delayMs = options.delayMs || 5000;
+    const onProgress = options.onProgress || (() => {});
+    const startedAt = Date.now();
     let lastError;
     for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
       try {
@@ -901,8 +931,10 @@ ${Object.keys(archive).length ? `\n${JSON.stringify(archive, null, 2)}` : '\nCon
         });
       } catch (error) {
         lastError = error;
-        els.quoteStatus.textContent = `Waiting for transaction confirmation… (${attempt}/${maxAttempts})`;
-        await new Promise((resolve) => setTimeout(resolve, delayMs));
+        onProgress({ attempt, maxAttempts, elapsedLabel: formatElapsed(Date.now() - startedAt) });
+        if (attempt < maxAttempts) {
+          await new Promise((resolve) => setTimeout(resolve, delayMs));
+        }
       }
     }
     throw lastError;
@@ -984,13 +1016,24 @@ ${Object.keys(archive).length ? `\n${JSON.stringify(archive, null, 2)}` : '\nCon
       return;
     }
     let purchase;
+    els.quoteStatus.textContent = 'Waiting for on-chain confirmation…';
+    els.quotePanel.innerHTML = `<div class="manifest-box">Transaction sent: ${txHash}\n\nWaiting for it to confirm on-chain. This can take a few minutes depending on network congestion — this page updates automatically, no need to resubmit.</div>`;
+    els.quotePanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     try {
-      purchase = await registerPurchaseWithRetry({
-        product: 'cast',
-        wallet: state.wallet,
-        txHash,
-        paymentMethod: paymentOption.id,
-      });
+      purchase = await registerPurchaseWithRetry(
+        {
+          product: 'cast',
+          wallet: state.wallet,
+          txHash,
+          paymentMethod: paymentOption.id,
+        },
+        {
+          onProgress: ({ attempt, maxAttempts, elapsedLabel }) => {
+            els.quoteStatus.textContent = `Waiting for on-chain confirmation… (${elapsedLabel})`;
+            els.quotePanel.innerHTML = `<div class="manifest-box">Transaction sent: ${txHash}\n\nWaiting for it to confirm on-chain (${elapsedLabel} elapsed, attempt ${attempt}/${maxAttempts}). This can take a few minutes depending on network congestion — this page updates automatically, no need to resubmit.</div>`;
+          },
+        },
+      );
     } catch (error) {
       els.quoteStatus.textContent = 'Payment sent but credit registration failed';
       els.quotePanel.innerHTML = `<div class="manifest-box">Transaction: ${txHash}\n${(error.payload && JSON.stringify(error.payload, null, 2)) || error.message}\n\nThis transaction is real — if it eventually confirms, register it manually from the Payments panel using this tx hash.</div>`;
