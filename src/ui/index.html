@@ -11,18 +11,20 @@
   <body>
     <div class="page-shell">
       <header class="topbar">
-        <div class="topbar-title">
-          <h1><img src="/e3d_logo_200.png" alt="E3D" class="title-logo">Cast <span class="powered-by">(powered by E3D)</span></h1>
-          <p class="subhead">Paste a transcript, upload source media, or use a public sample. Quote first, spend credits once, track artifacts after.</p>
+        <div class="topbar-row">
+          <div class="topbar-title">
+            <h1><img src="/e3d_logo_200.png" alt="E3D" class="title-logo">Cast <span class="powered-by">(powered by E3D)</span></h1>
+            <div class="topbar-links">
+              <a href="/pricing.html" target="_blank" rel="noreferrer" class="topbar-api-link">Pricing</a>
+              <a href="/agent.html" target="_blank" rel="noreferrer" class="topbar-api-link">API</a>
+            </div>
+          </div>
+          <div class="topbar-actions">
+            <button id="connect-wallet" class="button secondary">Connect Wallet</button>
+            <a id="get-e3d-link" class="button ghost" target="_blank" rel="noreferrer">Get E3D</a>
+          </div>
         </div>
-        <div class="topbar-links">
-          <a href="/pricing.html" target="_blank" rel="noreferrer" class="topbar-api-link">Pricing</a>
-          <a href="/agent.html" target="_blank" rel="noreferrer" class="topbar-api-link">API</a>
-        </div>
-        <div class="topbar-actions">
-          <button id="connect-wallet" class="button secondary">Connect Wallet</button>
-          <a id="get-e3d-link" class="button ghost" target="_blank" rel="noreferrer">Get E3D</a>
-        </div>
+        <p class="subhead">Paste a transcript, upload source media, or use a public sample. Quote first, spend credits once, track artifacts after.</p>
       </header>
 
       <section class="status-grid">
