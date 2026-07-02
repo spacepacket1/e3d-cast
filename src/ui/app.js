@@ -9,7 +9,7 @@
   const modes = [
     { id: 'upload', label: 'Upload', copy: 'Choose a local media file and register it with the service upload helper.' },
     { id: 'url', label: 'Source URL', copy: 'Quote and dispatch a hosted fetch from a public media URL.' },
-    { id: 'transcript', label: 'Transcript', copy: 'Paste transcript text, preview the tier fit, and submit a paid dry-run.' },
+    { id: 'transcript', label: 'Transcript', copy: 'Paste transcript text, preview the tier fit, and create a video.' },
     { id: 'sample', label: 'Sample', copy: 'Run a free public sample render before buying credits.' },
   ];
   const presets = [
@@ -118,12 +118,15 @@
     mode: 'transcript',
     preset: 'transcript_short',
     subtitleStyle: 'bold_mobile',
-    transcriptText: 'Host: Welcome to Cast.\nGuest: Today we are previewing a hosted dry-run render on E3D.',
+    transcriptText: 'Host: Welcome to Cast.\nGuest: Today we are previewing a hosted render on E3D.',
     sourceUrl: '',
     upload: null,
+    uploadBusy: false,
+    uploadError: '',
+    uploadProgress: 0,
     selectedSampleId: samples[0].id,
     title: 'Cast transcript short',
-    description: 'Preview subtitle style, watermark state, metadata, and dry-run pricing before spend.',
+    description: 'Preview subtitle style, watermark state, metadata, and pricing before spend.',
     tags: 'cast,e3d,transcript',
     archiveToIpfs: false,
     brandEndCard: true,
@@ -227,7 +230,7 @@
 
   function currentOptions() {
     return {
-      dryRun: true,
+      dryRun: false,
       subtitleStyle: state.subtitleStyle,
       brandEndCard: state.brandEndCard,
       archiveToIpfs: state.archiveToIpfs,
@@ -259,6 +262,34 @@
       reader.onload = () => resolve(String(reader.result).split(',').pop() || '');
       reader.onerror = reject;
       reader.readAsDataURL(file);
+    });
+  }
+
+  function uploadWithProgress(url, jsonBody, onProgress) {
+    // fetch() does not expose upload progress events, so use XMLHttpRequest
+    // for this request specifically.
+    return new Promise((resolve, reject) => {
+      const xhr = new XMLHttpRequest();
+      xhr.open('POST', url);
+      xhr.setRequestHeader('content-type', 'application/json');
+      if (xhr.upload) {
+        xhr.upload.onprogress = (event) => {
+          if (event.lengthComputable) onProgress(Math.round((event.loaded / event.total) * 100));
+        };
+      }
+      xhr.onload = () => {
+        let data = {};
+        try { data = JSON.parse(xhr.responseText || '{}'); } catch (_error) { /* non-JSON response */ }
+        if (xhr.status >= 200 && xhr.status < 300) {
+          resolve(data);
+        } else {
+          const error = new Error(data.error || `Request failed: ${xhr.status}`);
+          error.payload = data;
+          reject(error);
+        }
+      };
+      xhr.onerror = () => reject(new Error('Network error during upload'));
+      xhr.send(jsonBody);
     });
   }
 
@@ -310,34 +341,76 @@
     els.inputModeTabs.querySelectorAll('[data-mode]').forEach((button) => {
       button.addEventListener('click', () => {
         state.mode = button.dataset.mode;
+        state.preset = defaultPresetForMode(state.mode, state.preset);
+        persistState();
         render();
       });
     });
   }
 
+  const AUDIO_DRIVEN_PRESET = { transcript_video: 'youtube', transcript_short: 'short' };
+  const TEXT_DRIVEN_PRESET = { youtube: 'transcript_video', short: 'transcript_short' };
+
+  function defaultPresetForMode(mode, currentPreset) {
+    if ((mode === 'upload' || mode === 'url') && AUDIO_DRIVEN_PRESET[currentPreset]) {
+      return AUDIO_DRIVEN_PRESET[currentPreset];
+    }
+    if ((mode === 'transcript' || mode === 'sample') && TEXT_DRIVEN_PRESET[currentPreset]) {
+      return TEXT_DRIVEN_PRESET[currentPreset];
+    }
+    return currentPreset;
+  }
+
   function renderInputPanel() {
     if (state.mode === 'upload') {
+      const statusText = state.uploadError
+        ? `Upload failed: ${state.uploadError}`
+        : state.upload
+          ? `Registered ${state.upload.fileName} (${formatBytes(state.upload.sizeBytes)}) as ${state.upload.uploadId}`
+          : 'No upload registered yet. Supports m4a, mp3, wav, and mp4 — submitting a paid job runs real diarization + transcription and returns a captions/transcript artifact.';
       els.inputModePanel.innerHTML = `
-        <input id="upload-file" class="text-input" type="file" accept="audio/*,video/*">
-        <button id="upload-file-button" class="button secondary">Register upload</button>
-        <div class="small">${state.upload ? `Registered ${state.upload.fileName} (${formatBytes(state.upload.sizeBytes)}) as ${state.upload.uploadId}` : 'No upload registered yet.'}</div>
+        <input id="upload-file" class="text-input" type="file" accept="audio/*,video/*,.m4a,.mp3,.wav,.mp4" ${state.uploadBusy ? 'disabled' : ''}>
+        <div class="upload-actions">
+          <button id="upload-file-button" class="button secondary" ${state.uploadBusy ? 'disabled' : ''}>${state.uploadBusy ? 'Uploading…' : 'Register upload'}</button>
+          ${state.uploadBusy ? `
+            <div class="upload-progress-wrap">
+              <progress id="upload-progress" value="${state.uploadProgress || 0}" max="100"></progress>
+              <span id="upload-progress-text" class="small">${state.uploadProgress || 0}%</span>
+            </div>
+          ` : ''}
+        </div>
+        <div class="small">${statusText}</div>
       `;
       document.querySelector('#upload-file-button').addEventListener('click', async () => {
         const fileInput = document.querySelector('#upload-file');
         const file = fileInput.files && fileInput.files[0];
         if (!file) return;
-        const base64 = await fileToBase64(file);
-        state.upload = await apiJson('/ui-api/uploads', {
-          method: 'POST',
-          headers: { 'content-type': 'application/json' },
-          body: JSON.stringify({
+        state.uploadBusy = true;
+        state.uploadError = '';
+        state.uploadProgress = 0;
+        renderInputPanel();
+        try {
+          const base64 = await fileToBase64(file);
+          const payload = JSON.stringify({
             fileName: file.name,
             contentType: file.type,
             dataBase64: base64,
-          }),
-        });
-        persistState();
-        render();
+          });
+          state.upload = await uploadWithProgress('/ui-api/uploads', payload, (percent) => {
+            state.uploadProgress = percent;
+            const bar = document.querySelector('#upload-progress');
+            const label = document.querySelector('#upload-progress-text');
+            if (bar) bar.value = percent;
+            if (label) label.textContent = `${percent}%`;
+          });
+        } catch (error) {
+          state.upload = null;
+          state.uploadError = error.message || 'Upload failed';
+        } finally {
+          state.uploadBusy = false;
+          persistState();
+          render();
+        }
       });
       return;
     }
@@ -460,7 +533,7 @@
     els.creditKeyLabel.textContent = state.creditKey ? `Key ${state.creditKey.slice(0, 14)}...` : 'Add credits to unlock paid submission';
     els.activeTier.textContent = currentTier();
     els.freeAttempts.textContent = `Free sample attempts remaining: ${attemptsRemaining}`;
-    els.submitState.textContent = state.creditKey ? 'Paid dry-run ready' : 'Credit key required for paid submit';
+    els.submitState.textContent = state.creditKey ? 'Ready to create video' : 'Create Video will prompt a wallet payment for credits';
   }
 
   function renderQuotePanel() {
@@ -561,9 +634,48 @@
     return job;
   }
 
-  function artifactLink(job, artifact) {
-    if (job.kind === 'local-sample') return artifact.downloadUrl;
-    return artifact.downloadUrl;
+  const TEXT_ARTIFACT_TYPES = new Set(['application/x-subrip', 'text/plain']);
+
+  async function fetchArtifactBlob(job, artifact) {
+    if (job.kind === 'local-sample') {
+      const response = await fetch(artifact.downloadUrl);
+      if (!response.ok) throw new Error(`Failed to open sample artifact: ${response.status}`);
+      return response.blob();
+    }
+    const headers = state.creditKey ? { authorization: `Bearer ${state.creditKey}` } : {};
+    const response = await fetch(artifact.downloadUrl, { headers });
+    if (!response.ok) throw new Error(`Failed to open artifact: ${response.status}`);
+    return response.blob();
+  }
+
+  function triggerBlobDownload(blob, fileName) {
+    const objectUrl = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = objectUrl;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(objectUrl), 4000);
+  }
+
+  async function openArtifact(job, artifact) {
+    const preview = document.querySelector('#artifact-preview');
+    if (!preview) return;
+    preview.hidden = false;
+    preview.textContent = `Loading ${artifact.artifactId}…`;
+    try {
+      const blob = await fetchArtifactBlob(job, artifact);
+      const contentType = artifact.contentType || artifact.type || blob.type;
+      if (TEXT_ARTIFACT_TYPES.has(contentType)) {
+        preview.textContent = `${artifact.artifactId} (${contentType})\n\n${await blob.text()}`;
+        return;
+      }
+      preview.textContent = `Downloading ${artifact.fileName || artifact.artifactId}…`;
+      triggerBlobDownload(blob, artifact.fileName || artifact.artifactId);
+    } catch (error) {
+      preview.textContent = `Failed to open ${artifact.artifactId}: ${error.message}`;
+    }
   }
 
   function renderJobDetail() {
@@ -589,10 +701,11 @@
             <strong>${artifact.artifactId}</strong>
             <div class="small">${artifact.type || artifact.contentType}</div>
             <div class="small">${formatBytes(artifact.bytes || artifact.sizeBytes || 0)}</div>
-            <a class="button ghost" href="${artifactLink(job, artifact)}" target="_blank" rel="noreferrer">Open artifact</a>
+            <button class="button ghost" data-open-artifact="${artifact.artifactId}">${TEXT_ARTIFACT_TYPES.has(artifact.contentType) ? 'View transcript' : 'Open artifact'}</button>
           </article>
         `).join('')}
       </div>
+      <div id="artifact-preview" class="manifest-box" hidden></div>
       <div class="chip-row">
         <button class="button secondary" data-revision="thumbnail">Revision: thumbnail</button>
         <button class="button secondary" data-revision="metadata">Revision: metadata</button>
@@ -603,6 +716,12 @@
 ${Object.keys(archive).length ? `\n${JSON.stringify(archive, null, 2)}` : '\nConsent required before archive.'}
 \nNFT mint available: false</div>
     `;
+    els.jobDetail.querySelectorAll('[data-open-artifact]').forEach((button) => {
+      button.addEventListener('click', () => {
+        const artifact = artifacts.find((entry) => entry.artifactId === button.dataset.openArtifact);
+        if (artifact) openArtifact(job, artifact);
+      });
+    });
     els.jobDetail.querySelectorAll('[data-revision]').forEach((button) => {
       button.addEventListener('click', () => runRevision(job, button.dataset.revision));
     });
@@ -610,43 +729,28 @@ ${Object.keys(archive).length ? `\n${JSON.stringify(archive, null, 2)}` : '\nCon
     if (archiveButton) archiveButton.addEventListener('click', () => archiveJob(job));
   }
 
-  function renderAgentMode() {
-    const quoteBody = {
-      input: currentInput(),
-      preset: state.preset,
-      tier: currentTier(),
-    };
-    const submitBody = {
-      input: currentInput(),
-      preset: state.preset,
-      options: currentOptions(),
-      webhookUrl: 'https://agent.example.com/hooks/cast',
-    };
-    els.agentMode.innerHTML = `
-      <div class="code-card">
-        <strong>curl capabilities</strong>
-        <pre>curl -s ${location.origin}/api/cast/capabilities</pre>
-      </div>
-      <div class="code-card">
-        <strong>curl quote</strong>
-        <pre>curl -s -X POST ${location.origin}/api/cast/jobs/quote -H 'content-type: application/json' -d '${JSON.stringify(quoteBody, null, 2)}'</pre>
-      </div>
-      <div class="code-card">
-        <strong>curl submit</strong>
-        <pre>curl -s -X POST ${location.origin}/api/cast/jobs \\
-  -H 'Authorization: Bearer &lt;e3d_cast_pay_...&gt;' \\
-  -H 'Idempotency-Key: cast-demo-001' \\
-  -H 'content-type: application/json' \\
-  -d '${JSON.stringify(submitBody, null, 2)}'</pre>
-      </div>
-      <div class="code-card">
-        <strong>e3d-agent</strong>
-        <pre>e3d-agent cast render --preset ${state.preset} --dry-run --webhook https://agent.example.com/hooks/cast</pre>
-      </div>
-    `;
+  function inputReadinessIssue() {
+    if (state.mode === 'upload') {
+      if (state.uploadBusy) return 'Upload still in progress — wait for it to finish before quoting or submitting.';
+      if (!state.upload) return 'Register an upload first.';
+    }
+    if (state.mode === 'url' && !state.sourceUrl.trim()) {
+      return 'Enter a source URL first.';
+    }
+    if (state.mode === 'transcript' && !state.transcriptText.trim()) {
+      return 'Paste transcript text first.';
+    }
+    return '';
   }
 
   async function quoteJob() {
+    const issue = inputReadinessIssue();
+    if (issue) {
+      els.quoteStatus.textContent = 'Quote failed';
+      els.quotePanel.innerHTML = `<div class="manifest-box">${issue}</div>`;
+      els.quotePanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      return;
+    }
     els.quoteStatus.textContent = 'Quoting';
     try {
       const headers = { 'content-type': 'application/json' };
@@ -669,6 +773,7 @@ ${Object.keys(archive).length ? `\n${JSON.stringify(archive, null, 2)}` : '\nCon
       els.quoteStatus.textContent = 'Quote failed';
       els.quotePanel.innerHTML = `<div class="manifest-box">${(error.payload && JSON.stringify(error.payload, null, 2)) || error.message}</div>`;
     }
+    els.quotePanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
 
   async function quotePurchase() {
@@ -717,24 +822,215 @@ ${Object.keys(archive).length ? `\n${JSON.stringify(archive, null, 2)}` : '\nCon
     renderStatus();
   }
 
-  async function submitPaidJob() {
-    if (!state.creditKey) {
-      els.quoteStatus.textContent = 'Get E3D / buy credits first';
+  // Mirrors the backend's minimum credit purchase floor (productRegistry.js /
+  // x402Config.js MIN_CREDIT_PURCHASE) — not exposed via a public endpoint, so
+  // duplicated here deliberately rather than guessed at.
+  const MIN_CREDIT_PURCHASE = 500;
+
+  function erc20TransferCalldata(toAddress, amountWei) {
+    const selector = 'a9059cbb';
+    const addressPadded = toAddress.replace(/^0x/, '').toLowerCase().padStart(64, '0');
+    const amountPadded = amountWei.toString(16).padStart(64, '0');
+    return `0x${selector}${addressPadded}${amountPadded}`;
+  }
+
+  async function ensureWalletChain(chainId) {
+    const chainIdHex = `0x${Number(chainId).toString(16)}`;
+    try {
+      await window.ethereum.request({ method: 'wallet_switchEthereumChain', params: [{ chainId: chainIdHex }] });
+    } catch (switchError) {
+      if (switchError && switchError.code === 4902 && Number(chainId) === 8453) {
+        await window.ethereum.request({
+          method: 'wallet_addEthereumChain',
+          params: [{
+            chainId: chainIdHex,
+            chainName: 'Base',
+            nativeCurrency: { name: 'Ether', symbol: 'ETH', decimals: 18 },
+            rpcUrls: ['https://mainnet.base.org'],
+            blockExplorerUrls: ['https://basescan.org'],
+          }],
+        });
+      } else {
+        throw switchError;
+      }
+    }
+  }
+
+  async function sendErc20Payment({ wallet, tokenAddress, treasuryAddress, amountWei, chainId }) {
+    if (!window.ethereum || !window.ethereum.request) {
+      throw new Error('No wallet provider found — connect a browser wallet like MetaMask first.');
+    }
+    await ensureWalletChain(chainId);
+    const data = erc20TransferCalldata(treasuryAddress, amountWei);
+    return window.ethereum.request({
+      method: 'eth_sendTransaction',
+      params: [{ from: wallet, to: tokenAddress, data, value: '0x0' }],
+    });
+  }
+
+  function confirmPayment(purchaseQuote, paymentOption, jobQuote) {
+    return new Promise((resolve) => {
+      els.quoteStatus.textContent = 'Confirm payment';
+      els.quotePanel.innerHTML = `
+        <div class="info-stack">
+          <strong>Fund ${purchaseQuote.requiredBaseCredits} credits to create this video</strong>
+          <span>This job needs ${jobQuote.estimatedCredits} credits.</span>
+          <span>You will send ${paymentOption.requiredAmount} ${paymentOption.token} on ${paymentOption.chain} to ${paymentOption.treasuryAddress}.</span>
+        </div>
+        <div class="chip-row">
+          <button id="confirm-payment" class="button primary">Confirm &amp; pay</button>
+          <button id="cancel-payment" class="button ghost">Cancel</button>
+        </div>
+      `;
+      els.quotePanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      document.querySelector('#confirm-payment').addEventListener('click', () => resolve(true));
+      document.querySelector('#cancel-payment').addEventListener('click', () => resolve(false));
+    });
+  }
+
+  async function registerPurchaseWithRetry(payload) {
+    const maxAttempts = 30;
+    const delayMs = 4000;
+    let lastError;
+    for (let attempt = 1; attempt <= maxAttempts; attempt += 1) {
+      try {
+        return await apiJson('/ui-api/payments/credits/purchase', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json' },
+          body: JSON.stringify(payload),
+        });
+      } catch (error) {
+        lastError = error;
+        els.quoteStatus.textContent = `Waiting for transaction confirmation… (${attempt}/${maxAttempts})`;
+        await new Promise((resolve) => setTimeout(resolve, delayMs));
+      }
+    }
+    throw lastError;
+  }
+
+  async function autoFundAndCreateVideo() {
+    if (!state.wallet) {
+      await connectWallet();
+      if (!state.wallet) return;
+    }
+    const issue = inputReadinessIssue();
+    if (issue) {
+      els.quoteStatus.textContent = 'Create video failed';
+      els.quotePanel.innerHTML = `<div class="manifest-box">${issue}</div>`;
+      els.quotePanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       return;
     }
-    const submission = await apiJson('/api/cast/jobs', {
-      method: 'POST',
-      headers: {
-        authorization: `Bearer ${state.creditKey}`,
-        'idempotency-key': `ui-${Date.now()}`,
-        'content-type': 'application/json',
-      },
-      body: JSON.stringify({
-        input: currentInput(),
-        preset: state.preset,
-        options: currentOptions(),
-      }),
-    });
+    els.quoteStatus.textContent = 'Preparing…';
+    let jobQuote;
+    let purchaseQuote;
+    try {
+      jobQuote = await apiJson('/api/cast/jobs/quote', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ input: currentInput(), preset: state.preset, options: currentOptions(), tier: currentTier() }),
+      });
+      const neededCredits = Math.max(jobQuote.estimatedCredits, MIN_CREDIT_PURCHASE);
+      purchaseQuote = await apiJson('/ui-api/payments/credits/quote', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ product: 'cast', wallet: state.wallet, requestedIssuedCredits: neededCredits }),
+      });
+    } catch (error) {
+      els.quoteStatus.textContent = 'Create video failed';
+      els.quotePanel.innerHTML = `<div class="manifest-box">${(error.payload && JSON.stringify(error.payload, null, 2)) || error.message}</div>`;
+      els.quotePanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      return;
+    }
+    // Ethereum E3D default for now — Base wE3D has no liquidity pool yet.
+    const paymentOption = purchaseQuote.paymentOptions.find((option) => option.id === 'ethereum-e3d') || purchaseQuote.paymentOptions[0];
+    if (!paymentOption) {
+      els.quoteStatus.textContent = 'Create video failed';
+      els.quotePanel.innerHTML = '<div class="manifest-box">No payment method is configured for Cast.</div>';
+      els.quotePanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      return;
+    }
+    const confirmed = await confirmPayment(purchaseQuote, paymentOption, jobQuote);
+    if (!confirmed) {
+      els.quoteStatus.textContent = 'Payment canceled';
+      return;
+    }
+    let txHash;
+    try {
+      els.quoteStatus.textContent = 'Confirm the payment in your wallet…';
+      const amountWei = BigInt(purchaseQuote.requiredBaseCredits) * 10n ** 15n;
+      txHash = await sendErc20Payment({
+        wallet: state.wallet,
+        tokenAddress: paymentOption.tokenAddress,
+        treasuryAddress: paymentOption.treasuryAddress,
+        amountWei,
+        chainId: paymentOption.chainId,
+      });
+    } catch (error) {
+      els.quoteStatus.textContent = 'Payment failed';
+      els.quotePanel.innerHTML = `<div class="manifest-box">${error.message || 'Wallet rejected or failed to send the transaction.'}</div>`;
+      els.quotePanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      return;
+    }
+    let purchase;
+    try {
+      purchase = await registerPurchaseWithRetry({
+        product: 'cast',
+        wallet: state.wallet,
+        txHash,
+        paymentMethod: paymentOption.id,
+      });
+    } catch (error) {
+      els.quoteStatus.textContent = 'Payment sent but credit registration failed';
+      els.quotePanel.innerHTML = `<div class="manifest-box">Transaction: ${txHash}\n${(error.payload && JSON.stringify(error.payload, null, 2)) || error.message}\n\nThis transaction is real — if it eventually confirms, register it manually from the Payments panel using this tx hash.</div>`;
+      els.quotePanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      return;
+    }
+    state.creditKey = purchase.creditKey;
+    persistState();
+    await refreshBalance();
+    els.quoteStatus.textContent = 'Credits ready — creating video…';
+    await submitPaidJob(true);
+  }
+
+  async function submitPaidJob(isRetryAfterFunding) {
+    if (!state.creditKey) {
+      if (isRetryAfterFunding) {
+        els.quoteStatus.textContent = 'Get E3D / buy credits first';
+        return;
+      }
+      return autoFundAndCreateVideo();
+    }
+    const issue = inputReadinessIssue();
+    if (issue) {
+      els.quoteStatus.textContent = 'Create video failed';
+      els.quotePanel.innerHTML = `<div class="manifest-box">${issue}</div>`;
+      els.quotePanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      return;
+    }
+    let submission;
+    try {
+      submission = await apiJson('/api/cast/jobs', {
+        method: 'POST',
+        headers: {
+          authorization: `Bearer ${state.creditKey}`,
+          'idempotency-key': `ui-${Date.now()}`,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          input: currentInput(),
+          preset: state.preset,
+          options: currentOptions(),
+        }),
+      });
+    } catch (error) {
+      if (!isRetryAfterFunding && error.payload && error.payload.code === 'INSUFFICIENT_CREDITS') {
+        return autoFundAndCreateVideo();
+      }
+      els.quoteStatus.textContent = 'Create video failed';
+      els.quotePanel.innerHTML = `<div class="manifest-box">${(error.payload && JSON.stringify(error.payload, null, 2)) || error.message}</div>`;
+      els.quotePanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      return;
+    }
     const job = {
       jobId: submission.jobId,
       title: state.title,
@@ -749,10 +1045,15 @@ ${Object.keys(archive).length ? `\n${JSON.stringify(archive, null, 2)}` : '\nCon
     await fetchRemoteJob(job);
     await refreshBalance();
     render();
+    els.jobDetail.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
 
   function createLocalSampleJob() {
-    if (state.freeSampleAttemptsUsed >= 3) return;
+    if (state.freeSampleAttemptsUsed >= 3) {
+      els.quoteStatus.textContent = 'Free sample attempts used up';
+      els.quotePanel.innerHTML = '<div class="manifest-box">You have used all 3 free sample attempts. Buy credits and use Get quote / Create Video for a real render.</div>';
+      return;
+    }
     const sample = selectedSample();
     const jobId = `sample_${sample.id}_${Date.now()}`;
     state.freeSampleAttemptsUsed += 1;
@@ -773,6 +1074,7 @@ ${Object.keys(archive).length ? `\n${JSON.stringify(archive, null, 2)}` : '\nCon
     state.selectedJobId = jobId;
     persistState();
     render();
+    els.jobDetail.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
 
   async function runRevision(job, revisionType) {
@@ -787,7 +1089,7 @@ ${Object.keys(archive).length ? `\n${JSON.stringify(archive, null, 2)}` : '\nCon
       body: JSON.stringify({
         revisionType,
         options: {
-          dryRun: true,
+          dryRun: false,
           subtitleStyle: state.subtitleStyle,
           title: state.title,
           description: state.description,
@@ -868,7 +1170,7 @@ ${Object.keys(archive).length ? `\n${JSON.stringify(archive, null, 2)}` : '\nCon
     els.paymentsInfo.addEventListener('click', () => els.paymentsInfoDialog.showModal());
     els.dialogClose.addEventListener('click', () => els.paymentsInfoDialog.close());
     els.paymentsInfoDialog.addEventListener('click', (e) => { if (e.target === els.paymentsInfoDialog) els.paymentsInfoDialog.close(); });
-    els.titleInput.addEventListener('input', (event) => { state.title = event.target.value; persistState(); renderPreview(); renderAgentMode(); });
+    els.titleInput.addEventListener('input', (event) => { state.title = event.target.value; persistState(); renderPreview(); });
     els.descriptionInput.addEventListener('input', (event) => { state.description = event.target.value; persistState(); renderPreview(); });
     els.tagsInput.addEventListener('input', (event) => { state.tags = event.target.value; persistState(); });
     els.brandEndCard.addEventListener('change', (event) => { state.brandEndCard = event.target.checked; persistState(); renderPreview(); });

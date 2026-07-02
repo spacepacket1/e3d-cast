@@ -1,5 +1,5 @@
 {
-  "name": "e3d-pod2vid-service",
+  "name": "e3d-cast",
   "version": "0.1.0",
   "private": true,
   "description": "Hosted Cast service — UI, worker daemon, and deployment for cast.e3d.ai",

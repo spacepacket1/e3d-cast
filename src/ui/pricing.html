@@ -1,0 +1,116 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Cast Pricing</title>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="icon" type="image/png" sizes="32x32" href="/e3d_logo_32.png">
+    <link rel="stylesheet" href="/styles.css?v=7">
+    <style>
+      .agent-page { max-width: 860px; margin: 0 auto; padding: 40px 24px; }
+      .back-link { display: inline-block; margin-bottom: 28px; color: var(--muted); text-decoration: none; font-size: 0.9rem; }
+      .back-link:hover { color: var(--ink); }
+      .section-divider { border: none; border-top: 1px solid var(--line); margin: 32px 0; }
+      .pricing-table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 0.92rem; }
+      .pricing-table th, .pricing-table td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); }
+      .pricing-table th { color: var(--muted); font-size: 0.78rem; letter-spacing: 0.06em; text-transform: uppercase; }
+      .pricing-table td.num { font-family: var(--mono); }
+      .tier-free { color: var(--warning); font-weight: 700; }
+    </style>
+  </head>
+  <body>
+    <div class="agent-page">
+      <a href="/" class="back-link">← Back to Cast</a>
+      <h1><img src="/e3d_logo_200.png" alt="E3D" class="title-logo">Cast Pricing <span class="powered-by">(powered by E3D)</span></h1>
+      <p class="subhead">How credits work, what each tier unlocks, and what a render actually costs.</p>
+
+      <hr class="section-divider">
+
+      <h2>Credits</h2>
+      <p>Cast is paid with E3D credits. <strong>1,000 credits = 1 E3D or wE3D</strong>, before discounts. Buy credits with either Ethereum E3D or Base wE3D — both settle at the same rate. Holders of E3D get a <strong>20% discount</strong> on credit purchases, applied automatically when you connect a qualifying wallet.</p>
+      <p>Credits are spent once, at job submission time — quoting a job is always free and never spends credits.</p>
+
+      <hr class="section-divider">
+
+      <h2>Tiers</h2>
+      <p>Tiers set your size, length, duration, and retention limits. The <span class="tier-free">Free</span> tier is a safe preview: it never spends real credits on rendering and always runs as a watermarked dry-run, no matter what you submit — real renders start at Starter.</p>
+      <div id="tiers-table"><p class="small">Loading current tier limits…</p></div>
+
+      <hr class="section-divider">
+
+      <h2>What a job costs</h2>
+      <p>Every render has a base credit price by preset, plus a variable component for transcript-input jobs (see below). <strong>Pro tier gets a discount</strong> on every price on this page.</p>
+
+      <table class="pricing-table">
+        <thead>
+          <tr><th>Job</th><th>Input</th><th>Base credits (Starter/Free/Studio)</th><th>Base credits (Pro)</th></tr>
+        </thead>
+        <tbody>
+          <tr><td>Short (9:16)</td><td>Uploaded audio or source URL</td><td class="num">150</td><td class="num">125</td></tr>
+          <tr><td>YouTube (16:9)</td><td>Uploaded audio or source URL</td><td class="num">500</td><td class="num">400</td></tr>
+          <tr><td>Transcript short (9:16)</td><td>Pasted transcript text</td><td class="num">100 + length surcharge</td><td class="num">75 + length surcharge</td></tr>
+          <tr><td>Transcript video / TTS video (16:9)</td><td>Pasted transcript text</td><td class="num">125 + length surcharge</td><td class="num">100 + length surcharge</td></tr>
+          <tr><td>Revision (thumbnail, metadata, subtitle style)</td><td>—</td><td class="num">50</td><td class="num">40</td></tr>
+          <tr><td>Archive to IPFS</td><td>—</td><td class="num">+50</td><td class="num">+25</td></tr>
+        </tbody>
+      </table>
+
+      <h3>Why pasted transcripts have a length surcharge</h3>
+      <p>When you paste transcript text instead of uploading audio, Cast synthesizes narration for the <em>entire</em> transcript before rendering — so the real cost scales with how much text you paste, not which preset you pick. The surcharge is <strong>5 credits per 1,000 characters</strong> (4 per 1,000 for Pro), added on top of the base price above. A short paste of a few hundred characters barely moves the price; a Studio-tier transcript at the 200,000-character limit costs meaningfully more than a short one, in proportion to what it actually takes to produce.</p>
+      <p class="small">Uploaded-audio jobs (Short, YouTube) don't carry this surcharge — their cost is already covered by the flat preset price above regardless of audio length, up to your tier's duration limit.</p>
+
+      <hr class="section-divider">
+
+      <h2>Example</h2>
+      <p>A Starter-tier <strong>Transcript short</strong> job from a 2,000-character paste: 100 base + 10 surcharge (2 × 5) = <strong>110 credits</strong> = <strong>0.11 E3D</strong>.</p>
+
+      <hr class="section-divider">
+
+      <p class="small">Get exact numbers for your own job before you spend anything: quote it first with <a href="/agent.html">the API</a> (<code>POST /api/cast/jobs/quote</code> — free, no credits spent) or from the <a href="/">Cast workspace</a>.</p>
+    </div>
+
+    <script>
+      (function () {
+        function formatBytes(bytes) {
+          if (!bytes && bytes !== 0) return 'n/a';
+          if (bytes < 1_000_000) return `${(bytes / 1000).toFixed(0)} KB`;
+          if (bytes < 1_000_000_000) return `${(bytes / 1_000_000).toFixed(0)} MB`;
+          return `${(bytes / 1_000_000_000).toFixed(1)} GB`;
+        }
+        fetch('/api/cast/capabilities')
+          .then((r) => r.json())
+          .then((caps) => {
+            const el = document.querySelector('#tiers-table');
+            el.innerHTML = `
+              <table class="pricing-table">
+                <thead>
+                  <tr>
+                    <th>Tier</th><th>Max input</th><th>Max transcript</th><th>Max duration</th>
+                    <th>Max artifact size</th><th>Retention</th><th>Concurrency</th><th>Watermark</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  ${caps.tiers.map((t) => `
+                    <tr>
+                      <td class="${t.id === 'free' ? 'tier-free' : ''}">${t.id}${t.id === 'free' ? ` (${t.freeAttempts} free attempts, always dry-run)` : ''}</td>
+                      <td class="num">${formatBytes(t.maxInputBytes)}</td>
+                      <td class="num">${t.maxTranscriptChars.toLocaleString()} chars</td>
+                      <td class="num">${t.maxOutputDurationSeconds >= 3600 ? (t.maxOutputDurationSeconds / 3600) + 'h' : (t.maxOutputDurationSeconds / 60) + 'm'}</td>
+                      <td class="num">${formatBytes(t.maxArtifactBytes)}</td>
+                      <td class="num">${t.retentionHours >= 24 ? (t.retentionHours / 24) + 'd' : t.retentionHours + 'h'}</td>
+                      <td class="num">${t.concurrency}</td>
+                      <td>${t.watermarked ? 'Yes' : 'No'}</td>
+                    </tr>
+                  `).join('')}
+                </tbody>
+              </table>
+            `;
+          })
+          .catch(() => {
+            document.querySelector('#tiers-table').innerHTML = '<p class="small">Live tier data is unavailable right now — see the <a href="/agent.html">API docs</a> for GET /api/cast/capabilities.</p>';
+          });
+      }());
+    </script>
+  </body>
+</html>

@@ -15,7 +15,10 @@
           <h1><img src="/e3d_logo_200.png" alt="E3D" class="title-logo">Cast <span class="powered-by">(powered by E3D)</span></h1>
           <p class="subhead">Paste a transcript, upload source media, or use a public sample. Quote first, spend credits once, track artifacts after.</p>
         </div>
-        <a href="/agent.html" target="_blank" rel="noreferrer" class="topbar-api-link">API</a>
+        <div class="topbar-links">
+          <a href="/pricing.html" target="_blank" rel="noreferrer" class="topbar-api-link">Pricing</a>
+          <a href="/agent.html" target="_blank" rel="noreferrer" class="topbar-api-link">API</a>
+        </div>
         <div class="topbar-actions">
           <button id="connect-wallet" class="button secondary">Connect Wallet</button>
           <a id="get-e3d-link" class="button ghost" target="_blank" rel="noreferrer">Get E3D</a>
@@ -104,7 +107,7 @@
 
           <div class="action-row">
             <button id="quote-job" class="button primary">Get quote</button>
-            <button id="submit-job" class="button secondary">Submit paid dry-run</button>
+            <button id="submit-job" class="button secondary">Create Video</button>
             <button id="try-free-render" class="button ghost">Try free render</button>
           </div>
         </section>
@@ -135,8 +138,8 @@
               <div id="purchase-quote" class="info-stack"></div>
               <input id="tx-hash" class="text-input mono" type="text" placeholder="0x transaction hash">
               <select id="payment-method" class="text-input">
-                <option value="base-we3d">Base wE3D</option>
                 <option value="ethereum-e3d">Ethereum E3D</option>
+                <option value="base-we3d">Base wE3D</option>
               </select>
               <button id="register-purchase" class="button secondary">Register purchase</button>
               <button id="refresh-balance" class="button ghost">Refresh balance</button>
@@ -175,7 +178,7 @@
               <h2>Artifacts and revisions</h2>
             </div>
           </div>
-          <div id="job-detail" class="job-detail empty-state">Submit a dry-run or free sample render to inspect artifacts, archive options, and revision actions.</div>
+          <div id="job-detail" class="job-detail empty-state">Create a video or run a free sample render to inspect artifacts, archive options, and revision actions.</div>
         </section>
       </section>
     </div>

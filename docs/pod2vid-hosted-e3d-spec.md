@@ -2,7 +2,7 @@
 
 **Project:** e3d-pod2vid  
 **Feature:** Hosted `cast.e3d.ai` product, E3D-paid API endpoints, wallet UI, and agent automation  
-**Target repos:** `/home/ubuntu/e3d-pod2vid`, `/home/ubuntu/e3d-pod2vid-service`, `/home/ubuntu/spacepacket/server`, `/home/ubuntu/e3d-agent`  
+**Target repos:** `/home/ubuntu/e3d-pod2vid`, `/home/ubuntu/e3d-cast`, `/home/ubuntu/spacepacket/server`, `/home/ubuntu/e3d-agent`  
 **Status:** Draft for discussion  
 **Priority:** High  
 **Implementation mode:** Phased, suitable for codex-spec-runner  
@@ -19,14 +19,14 @@ Launch directory by repo:
 |---|---|
 | `/home/ubuntu/spacepacket/server` | `cd /home/ubuntu/spacepacket/server` |
 | `/home/ubuntu/e3d-pod2vid` | `cd /home/ubuntu/e3d-pod2vid` |
-| `/home/ubuntu/e3d-pod2vid-service` | `cd /home/ubuntu/e3d-pod2vid-service` |
+| `/home/ubuntu/e3d-cast` | `cd /home/ubuntu/e3d-cast` |
 | `/home/ubuntu/e3d-agent` | `cd /home/ubuntu/e3d-agent` |
 
 Always pass the spec as an absolute path:
 
 ```bash
 cd <repo listed in the target phase>
-codex-spec-runner /home/ubuntu/e3d-pod2vid-service/docs/pod2vid-hosted-e3d-spec.md <number>
+codex-spec-runner /home/ubuntu/e3d-cast/docs/pod2vid-hosted-e3d-spec.md <number>
 ```
 
 Each phase may assume all preceding phases are complete and committed. If the target repo does not exist, create it before launching.
@@ -432,7 +432,7 @@ The UI should be dense and operational. Avoid a marketing-only hero. Use the pro
 ### 6.1 Components
 
 ```text
-e3d-pod2vid-service  (/home/ubuntu/e3d-pod2vid-service)
+e3d-cast  (/home/ubuntu/e3d-cast)
   -> UI: Vite/React app served from cast.e3d.ai
   -> Worker daemon: PM2 process that picks jobs from queue and shells out to e3d-pod2vid
   -> Nginx config and deployment scripts
@@ -455,7 +455,7 @@ e3d-agent  (/home/ubuntu/e3d-agent)
   -> CLI and reusable client for automated credit purchase and job execution
 ```
 
-The worker in `e3d-pod2vid-service` calls into `e3d-pod2vid` by path:
+The worker in `e3d-cast` calls into `e3d-pod2vid` by path:
 
 ```bash
 python3 /home/ubuntu/e3d-pod2vid/bin/pod2vid-job.py <manifest-path>
@@ -1552,14 +1552,14 @@ Acceptance:
 Repo:
 
 ```text
-/home/ubuntu/e3d-pod2vid-service
+/home/ubuntu/e3d-cast
 ```
 
 Create this repo if it does not exist. It is a new repository — do not add these files to `/home/ubuntu/e3d-pod2vid`.
 
 **v1 tasks:**
 
-Worker daemon (new in `e3d-pod2vid-service`):
+Worker daemon (new in `e3d-cast`):
 
 - implement a PM2 worker process that polls the job queue from Spacepacket and dispatches jobs;
 - shell out to `/home/ubuntu/e3d-pod2vid/bin/pod2vid-job.py <manifest-path>` for each job;
@@ -1567,7 +1567,7 @@ Worker daemon (new in `e3d-pod2vid-service`):
 - handle worker errors, timeouts, and unexpected exits cleanly;
 - write a `cast-worker` PM2 app entry in `ecosystem.config.js`.
 
-UI (new in `e3d-pod2vid-service`):
+UI (new in `e3d-cast`):
 
 - implement the workspace UI;
 - implement Upload, Source URL, Transcript, and Sample input modes;
@@ -1585,7 +1585,7 @@ UI (new in `e3d-pod2vid-service`):
 - add agent-mode examples in the UI;
 - configure build output for Nginx/static hosting or a Node UI server.
 
-**v1.1 tasks (deferred — do not implement in Phase 4, add to `e3d-pod2vid-service` in Phase 7):**
+**v1.1 tasks (deferred — do not implement in Phase 4, add to `e3d-cast` in Phase 7):**
 
 - NFT provenance panel and mint confirmation flow;
 - revision actions for end card, B-roll, and voice;
@@ -1650,7 +1650,7 @@ Acceptance:
 Repo:
 
 ```text
-/home/ubuntu/e3d-pod2vid-service
+/home/ubuntu/e3d-cast
 ```
 
 Tasks:
@@ -1726,7 +1726,7 @@ Repo:
 Repo:
 
 ```text
-/home/ubuntu/e3d-pod2vid-service
+/home/ubuntu/e3d-cast
 ```
 
 **Tasks:**

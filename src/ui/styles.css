@@ -158,6 +158,27 @@ h2 {
   font-weight: 700;
 }
 
+.upload-actions {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+
+.upload-actions .button {
+  flex: 0 0 auto;
+}
+
+.upload-progress-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.upload-progress-wrap progress {
+  width: 160px;
+}
+
 .input-panel,
 .payment-controls,
 .quote-panel,
@@ -387,6 +408,13 @@ pre {
   top: -0.06em;
 }
 
+.topbar-links {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  justify-content: center;
+}
+
 .topbar-api-link {
   text-align: center;
   color: var(--muted);
@@ -516,6 +544,7 @@ dialog::backdrop {
 }
 
 @media (max-width: 1120px) {
+  .topbar-links,
   .topbar-api-link {
     display: none;
   }

@@ -12,9 +12,9 @@ This phase covers the production deployment assets for `cast.e3d.ai`: PM2 proces
 
 ## Files added for deployment
 
-- PM2 app definitions: [ecosystem.config.js](/home/ubuntu/e3d-pod2vid-service/ecosystem.config.js)
-- Nginx template: [deploy/nginx/cast.e3d.ai.conf](/home/ubuntu/e3d-pod2vid-service/deploy/nginx/cast.e3d.ai.conf)
-- Smoke test runner: [scripts/smoke-deploy.js](/home/ubuntu/e3d-pod2vid-service/scripts/smoke-deploy.js)
+- PM2 app definitions: [ecosystem.config.js](/home/ubuntu/e3d-cast/ecosystem.config.js)
+- Nginx template: [deploy/nginx/cast.e3d.ai.conf](/home/ubuntu/e3d-cast/deploy/nginx/cast.e3d.ai.conf)
+- Smoke test runner: [scripts/smoke-deploy.js](/home/ubuntu/e3d-cast/scripts/smoke-deploy.js)
 
 ## Expected environment
 

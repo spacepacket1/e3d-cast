@@ -67,6 +67,6 @@ test('ui home serves the workspace shell', async () => {
 
   const response = await invoke(server, { method: 'GET', url: '/' });
   assert.strictEqual(response.statusCode, 200);
-  assert.match(response.body, /Cast on E3D/);
+  assert.match(response.body, /Cast \(powered by E3D\)/);
   assert.match(response.body, /id="get-e3d-link"/);
 });
