@@ -73,11 +73,19 @@ function ensureDir(dirPath) {
   fs.mkdirSync(dirPath, { recursive: true });
 }
 
+// Headers describing the browser's own request context. This proxy call is a
+// trusted server-to-server hop, not the cross-origin browser request itself —
+// forwarding the browser's Origin verbatim trips the upstream API's strict
+// CORS allowlist (it doesn't include cast.e3d.ai) and turns into a 500 for
+// every real browser client, even though curl/server-to-server calls (no
+// Origin header) pass fine.
+const DROPPED_PROXY_HEADERS = new Set(['host', 'origin']);
+
 function proxyHeaders(reqHeaders, extraHeaders = {}) {
   const headers = { ...extraHeaders };
   for (const [key, value] of Object.entries(reqHeaders || {})) {
     if (value == null) continue;
-    if (key.toLowerCase() === 'host') continue;
+    if (DROPPED_PROXY_HEADERS.has(key.toLowerCase())) continue;
     headers[key] = value;
   }
   return headers;
