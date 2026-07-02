@@ -45,6 +45,10 @@ function contentTypeFor(filePath) {
     case '.jpg':
     case '.jpeg':
       return 'image/jpeg';
+    case '.mp4':
+      return 'video/mp4';
+    case '.srt':
+      return 'application/x-subrip';
     default:
       return 'application/octet-stream';
   }
@@ -187,11 +191,64 @@ function serveFile(res, filePath) {
   res.end(fs.readFileSync(filePath));
 }
 
+// Public sample gallery assets can be large videos, so this streams via
+// fs.createReadStream and honors Range requests -- serveFile()'s
+// fs.readFileSync would load the entire file into memory per request and
+// gives browsers no way to seek or resume a partial download.
+function serveSampleAsset(req, res, publicSamplesDir, requestPath) {
+  const relative = decodeURIComponent(requestPath.replace(/^\/samples\//, ''));
+  const resolved = path.resolve(publicSamplesDir, relative);
+  const root = path.resolve(publicSamplesDir) + path.sep;
+  if (!resolved.startsWith(root)) {
+    res.statusCode = 400;
+    res.end('invalid path');
+    return;
+  }
+  if (!fs.existsSync(resolved) || !fs.statSync(resolved).isFile()) {
+    res.statusCode = 404;
+    res.end('not found');
+    return;
+  }
+  const stat = fs.statSync(resolved);
+  const contentType = contentTypeFor(resolved);
+  const range = req.headers ? req.headers.range : null;
+  if (!range) {
+    res.statusCode = 200;
+    res.setHeader('content-type', contentType);
+    res.setHeader('content-length', stat.size);
+    res.setHeader('accept-ranges', 'bytes');
+    fs.createReadStream(resolved).pipe(res);
+    return;
+  }
+  const match = /^bytes=(\d*)-(\d*)$/.exec(range);
+  if (!match) {
+    res.statusCode = 416;
+    res.setHeader('content-range', `bytes */${stat.size}`);
+    res.end();
+    return;
+  }
+  const start = match[1] ? Number(match[1]) : 0;
+  const end = match[2] ? Number(match[2]) : stat.size - 1;
+  if (start > end || end >= stat.size) {
+    res.statusCode = 416;
+    res.setHeader('content-range', `bytes */${stat.size}`);
+    res.end();
+    return;
+  }
+  res.statusCode = 206;
+  res.setHeader('content-type', contentType);
+  res.setHeader('content-range', `bytes ${start}-${end}/${stat.size}`);
+  res.setHeader('content-length', end - start + 1);
+  res.setHeader('accept-ranges', 'bytes');
+  fs.createReadStream(resolved, { start, end }).pipe(res);
+}
+
 function createServer(config = {}) {
   const rootDir = config.rootDir || path.resolve(__dirname, '..', '..');
   const uiDir = config.uiDir || getEnv('CAST_UI_DIR', path.join(rootDir, 'src', 'ui'));
   const targetBaseUrl = config.spacepacketApiUrl || getEnv('SPACEPACKET_API_URL', 'http://localhost:3000');
   const uploadDir = config.uploadDir || getEnv('CAST_UPLOAD_DIR', path.join(getEnv('CAST_STORAGE_DIR', '/tmp/e3d-pod2vid'), 'uploads'));
+  const publicSamplesDir = config.publicSamplesDir || getEnv('CAST_PUBLIC_SAMPLES_DIR', path.join(getEnv('CAST_STORAGE_DIR', '/tmp/e3d-pod2vid'), 'public-samples'));
   const publicBaseUrl = getEnv('CAST_PUBLIC_BASE_URL', 'https://cast.e3d.ai');
   const getE3dUrl = getEnv('CAST_GET_E3D_URL', 'https://e3d.ai/token');
   const serviceToken = getEnv('SPACEPACKET_SERVICE_BEARER_TOKEN', '');
@@ -218,6 +275,9 @@ function createServer(config = {}) {
       }
       if (req.method === 'POST' && requestUrl.pathname === '/ui-api/uploads') {
         return handleUpload(req, res, { uploadDir });
+      }
+      if (req.method === 'GET' && requestUrl.pathname.startsWith('/samples/')) {
+        return serveSampleAsset(req, res, publicSamplesDir, requestUrl.pathname);
       }
       if (
         requestUrl.pathname === '/ui-api/payments/credits/quote'

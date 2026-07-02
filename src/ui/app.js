@@ -60,6 +60,29 @@
     },
   ];
 
+  // A real render from production (cast_job_9034809111fff54b) backing the
+  // "Audio to YouTube package" sample, instead of the synthetic SVG
+  // poster + JSON manifest the other samples still use. Served from
+  // /samples/* (public, unauthenticated, range-request capable -- see
+  // serveSampleAsset in src/server/index.js).
+  const REAL_SAMPLE_ASSETS = {
+    'sample-audio': {
+      baseUrl: '/samples/audio-youtube',
+      artifacts: [
+        { artifactId: 'video', type: 'mp4', contentType: 'video/mp4', bytes: 603400139, fileName: 'video.mp4' },
+        { artifactId: 'thumbnail', type: 'thumbnail', contentType: 'image/png', bytes: 25282, fileName: 'thumbnail.png' },
+        { artifactId: 'captions', type: 'srt', contentType: 'application/x-subrip', bytes: 28281, fileName: 'captions.srt' },
+        { artifactId: 'metadata', type: 'metadata', contentType: 'application/json', bytes: 351, fileName: 'metadata.json' },
+      ],
+    },
+  };
+
+  function realSampleArtifacts(sample) {
+    const real = REAL_SAMPLE_ASSETS[sample.id];
+    if (!real) return null;
+    return real.artifacts.map((artifact) => ({ ...artifact, downloadUrl: `${real.baseUrl}/${artifact.fileName}` }));
+  }
+
   const els = {
     connectWallet: document.querySelector('#connect-wallet'),
     getE3dLink: document.querySelector('#get-e3d-link'),
@@ -184,6 +207,9 @@
   }
 
   function samplePoster(sample) {
+    if (REAL_SAMPLE_ASSETS[sample.id]) {
+      return `${REAL_SAMPLE_ASSETS[sample.id].baseUrl}/thumbnail.png`;
+    }
     const svg = `
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 450">
         <defs>
@@ -739,6 +765,19 @@
     const preview = document.querySelector('#artifact-preview');
     if (!preview) return;
     preview.hidden = false;
+    // Public sample video is served directly from a static, unauthenticated
+    // URL (/samples/*) with Range support, so the browser can stream/seek it
+    // natively -- pulling all ~600MB through fetch()+Blob just to play it
+    // would be slow and needlessly memory-heavy.
+    if (job.kind === 'local-sample' && artifact.contentType === 'video/mp4') {
+      preview.textContent = '';
+      const video = document.createElement('video');
+      video.controls = true;
+      video.style.maxWidth = '100%';
+      video.src = artifact.downloadUrl;
+      preview.appendChild(video);
+      return;
+    }
     preview.textContent = `Loading ${artifact.artifactId}…`;
     try {
       const blob = await fetchArtifactBlob(job, artifact);
@@ -777,7 +816,7 @@
             <strong>${artifact.artifactId}</strong>
             <div class="small">${artifact.type || artifact.contentType}</div>
             <div class="small">${formatBytes(artifact.bytes || artifact.sizeBytes || 0)}</div>
-            <button class="button ghost" data-open-artifact="${artifact.artifactId}">${TEXT_ARTIFACT_TYPES.has(artifact.contentType) ? 'View transcript' : 'Open artifact'}</button>
+            <button class="button ghost" data-open-artifact="${artifact.artifactId}">${TEXT_ARTIFACT_TYPES.has(artifact.contentType) ? 'View transcript' : artifact.contentType === 'video/mp4' ? 'Play video' : 'Open artifact'}</button>
           </article>
         `).join('')}
       </div>
@@ -1196,7 +1235,7 @@ ${Object.keys(archive).length ? `\n${JSON.stringify(archive, null, 2)}` : '\nCon
       tier: 'free',
       preset: sample.preset,
       inputKind: sample.inputKind,
-      artifacts: [
+      artifacts: realSampleArtifacts(sample) || [
         { artifactId: 'preview_frame', type: 'image/svg+xml', bytes: 1200, downloadUrl: samplePoster(sample) },
         { artifactId: 'manifest', type: 'application/json', bytes: 950, downloadUrl: `data:application/json,${encodeURIComponent(JSON.stringify(sample, null, 2))}` },
       ],
