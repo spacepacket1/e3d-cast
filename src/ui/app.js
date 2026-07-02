@@ -101,6 +101,7 @@
     refreshBalance: document.querySelector('#refresh-balance'),
     sampleGallery: document.querySelector('#sample-gallery'),
     jobsList: document.querySelector('#jobs-list'),
+    loadWalletJobs: document.querySelector('#load-wallet-jobs'),
     jobDetail: document.querySelector('#job-detail'),
     tokenBalances: document.querySelector('#token-balances'),
     paymentsInfo: document.querySelector('#payments-info'),
@@ -254,6 +255,76 @@
       throw error;
     }
     return data;
+  }
+
+  // Proof that this browser controls the connected wallet, established once
+  // per (re)connect by signing a timestamped message with the wallet itself
+  // rather than by trusting the (public, unauthenticated) address alone.
+  // Deliberately kept out of `state`/localStorage — it's short-lived
+  // (matches the server's 5-minute signature window) and re-derived per
+  // session, not something that should persist across page loads.
+  let walletProof = null;
+  const WALLET_PROOF_MAX_AGE_MS = 4 * 60 * 1000;
+
+  function utf8ToHex(text) {
+    return '0x' + Array.from(new TextEncoder().encode(text)).map((byte) => byte.toString(16).padStart(2, '0')).join('');
+  }
+
+  function walletProofIsFresh() {
+    return !!walletProof
+      && walletProof.wallet === state.wallet
+      && (Date.now() - walletProof.obtainedAt) < WALLET_PROOF_MAX_AGE_MS;
+  }
+
+  async function ensureWalletProof() {
+    if (walletProofIsFresh()) return walletProof;
+    if (!state.wallet) throw new Error('Connect a wallet first.');
+    if (!window.ethereum || !window.ethereum.request) {
+      throw new Error('A browser wallet (e.g. MetaMask) is required to prove wallet ownership.');
+    }
+    const message = `Cast: list my jobs at ${new Date().toISOString()}`;
+    const signature = await window.ethereum.request({
+      method: 'personal_sign',
+      params: [utf8ToHex(message), state.wallet],
+    });
+    walletProof = { wallet: state.wallet, message, signature, obtainedAt: Date.now() };
+    return walletProof;
+  }
+
+  // Appends the cached wallet proof as query params so authenticated GETs
+  // (job status, artifact list, artifact bytes) work for jobs discovered via
+  // wallet listing, not just ones created with the currently-remembered
+  // credit key. A no-op once the proof goes stale -- the request just falls
+  // back to whatever auth (if any) it already had.
+  function withWalletProofParams(url) {
+    if (!walletProofIsFresh()) return url;
+    const joiner = url.includes('?') ? '&' : '?';
+    return `${url}${joiner}wallet=${encodeURIComponent(walletProof.wallet)}&message=${encodeURIComponent(walletProof.message)}&signature=${encodeURIComponent(walletProof.signature)}`;
+  }
+
+  async function loadJobsForWallet() {
+    const proof = await ensureWalletProof();
+    const result = await apiJson('/api/cast/jobs/list', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ wallet: proof.wallet, message: proof.message, signature: proof.signature }),
+    });
+    const existingIds = new Set(state.jobs.map((job) => job.jobId));
+    for (const serverJob of result.jobs || []) {
+      if (existingIds.has(serverJob.jobId)) continue;
+      state.jobs.push({
+        jobId: serverJob.jobId,
+        title: '',
+        status: serverJob.status,
+        tier: serverJob.tier,
+        inputKind: serverJob.inputKind,
+        preset: serverJob.outputPreset,
+        remoteStatus: serverJob,
+      });
+    }
+    persistState();
+    render();
+    return result.jobs || [];
   }
 
   function fileToBase64(file) {
@@ -613,8 +684,13 @@
         state.selectedJobId = button.dataset.job;
         persistState();
         const job = selectedJob();
-        if (job && job.kind !== 'local-sample' && !job.remoteStatus && state.creditKey) {
-          await fetchRemoteJob(job);
+        if (job && job.kind !== 'local-sample' && !job.remoteStatus && (state.creditKey || walletProofIsFresh())) {
+          try {
+            await fetchRemoteJob(job);
+          } catch (error) {
+            els.jobDetail.innerHTML = `<div class="manifest-box">${error.message}\n\nIf this job wasn't created with your current credit key, click "Load my jobs" first to prove wallet ownership.</div>`;
+            return;
+          }
         }
         renderJobDetail();
       });
@@ -627,8 +703,8 @@
 
   async function fetchRemoteJob(job) {
     const headers = state.creditKey ? { authorization: `Bearer ${state.creditKey}` } : {};
-    const status = await apiJson(`/api/cast/jobs/${job.jobId}`, { headers });
-    const artifacts = await apiJson(`/api/cast/jobs/${job.jobId}/artifacts`, { headers });
+    const status = await apiJson(withWalletProofParams(`/api/cast/jobs/${job.jobId}`), { headers });
+    const artifacts = await apiJson(withWalletProofParams(`/api/cast/jobs/${job.jobId}/artifacts`), { headers });
     job.remoteStatus = status;
     job.artifacts = artifacts.artifacts;
     return job;
@@ -643,7 +719,7 @@
       return response.blob();
     }
     const headers = state.creditKey ? { authorization: `Bearer ${state.creditKey}` } : {};
-    const response = await fetch(artifact.downloadUrl, { headers });
+    const response = await fetch(withWalletProofParams(artifact.downloadUrl), { headers });
     if (!response.ok) throw new Error(`Failed to open artifact: ${response.status}`);
     return response.blob();
   }
@@ -1216,6 +1292,21 @@ ${Object.keys(archive).length ? `\n${JSON.stringify(archive, null, 2)}` : '\nCon
     els.archiveToggle.checked = state.archiveToIpfs;
 
     els.connectWallet.addEventListener('click', connectWallet);
+    els.loadWalletJobs.addEventListener('click', async () => {
+      const original = els.loadWalletJobs.textContent;
+      els.loadWalletJobs.disabled = true;
+      els.loadWalletJobs.textContent = 'Loading…';
+      try {
+        const jobs = await loadJobsForWallet();
+        els.loadWalletJobs.textContent = `Loaded ${jobs.length} job${jobs.length === 1 ? '' : 's'}`;
+      } catch (error) {
+        els.jobsList.innerHTML = `<div class="empty-state">${error.message}</div>`;
+        els.loadWalletJobs.textContent = original;
+      } finally {
+        els.loadWalletJobs.disabled = false;
+        setTimeout(() => { els.loadWalletJobs.textContent = original; }, 3000);
+      }
+    });
     els.quoteJob.addEventListener('click', quoteJob);
     els.quotePurchase.addEventListener('click', quotePurchase);
     els.registerPurchase.addEventListener('click', registerPurchase);
