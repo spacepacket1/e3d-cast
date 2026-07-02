@@ -212,14 +212,38 @@ h2 {
   margin: 18px 0;
 }
 
-/* Space the "Output preset" block from the input-mode panel above it, and
-   the "Platform metadata" block from the caption/brand-kit row above it --
-   scoped to these two spots rather than a blanket .section-block margin,
-   since .section-block is also used nested inside .two-column grids where
-   extra margin isn't wanted. */
-#input-mode-panel + .section-block,
+/* Space the "Output preset" block (now inside #advanced-options) from the
+   input-mode panel above it, and the "Platform metadata" block from the
+   caption/brand-kit row above it -- scoped to these two spots rather than
+   a blanket .section-block margin, since .section-block is also used
+   nested inside .two-column grids where extra margin isn't wanted. */
+#input-mode-panel + #advanced-options,
 .two-column + .section-block {
   margin-top: 18px;
+}
+
+.workspace-mode-toggle {
+  display: inline-flex;
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.workspace-mode-toggle button {
+  padding: 6px 16px;
+  border-radius: 999px;
+  border: 1px solid var(--line);
+  background: rgba(255, 255, 255, 0.78);
+  font: inherit;
+  font-size: 0.86rem;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--muted);
+}
+
+.workspace-mode-toggle button.active {
+  background: var(--ink);
+  color: #fff;
+  border-color: var(--ink);
 }
 
 .preset-grid {

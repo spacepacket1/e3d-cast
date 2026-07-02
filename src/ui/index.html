@@ -62,34 +62,42 @@
             <span id="submit-state" class="badge">Ready to quote</span>
           </div>
 
+          <div class="workspace-mode-toggle" id="workspace-mode-toggle">
+            <button data-workspace-mode="basic">Basic</button>
+            <button data-workspace-mode="advanced">Advanced</button>
+          </div>
+          <p class="small" id="workspace-mode-copy"></p>
+
           <div class="tab-row" id="input-mode-tabs"></div>
           <div id="input-mode-panel" class="input-panel"></div>
 
-          <div class="section-block">
-            <p class="section-title">Output preset</p>
-            <div class="preset-grid" id="preset-grid"></div>
-          </div>
-
-          <div class="two-column">
+          <div id="advanced-options">
             <div class="section-block">
-              <p class="section-title">Caption style</p>
-              <div class="style-grid" id="style-grid"></div>
+              <p class="section-title">Output preset</p>
+              <div class="preset-grid" id="preset-grid"></div>
             </div>
-            <div class="section-block">
-              <p class="section-title">Brand kit</p>
-              <label class="toggle-row"><input id="brand-end-card" type="checkbox" checked> End card enabled</label>
-              <label class="toggle-row"><input id="made-with-toggle" type="checkbox" checked> Made with Cast rebate enabled</label>
-              <label class="toggle-row"><input id="archive-toggle" type="checkbox"> Archive to IPFS after completion</label>
-              <p id="watermark-copy" class="small"></p>
-              <p class="small">Holder rebate preview: <span id="rebate-copy">Leave the end card on for a small paid-tier rebate.</span></p>
-            </div>
-          </div>
 
-          <div class="section-block">
-            <p class="section-title">Platform metadata</p>
-            <input id="title-input" class="text-input" type="text" placeholder="Video title">
-            <textarea id="description-input" class="text-area compact" placeholder="Description"></textarea>
-            <input id="tags-input" class="text-input" type="text" placeholder="tags, comma, separated">
+            <div class="two-column">
+              <div class="section-block">
+                <p class="section-title">Caption style</p>
+                <div class="style-grid" id="style-grid"></div>
+              </div>
+              <div class="section-block">
+                <p class="section-title">Brand kit</p>
+                <label class="toggle-row"><input id="brand-end-card" type="checkbox" checked> End card enabled</label>
+                <label class="toggle-row"><input id="made-with-toggle" type="checkbox" checked> Made with Cast rebate enabled</label>
+                <label class="toggle-row"><input id="archive-toggle" type="checkbox"> Archive to IPFS after completion</label>
+                <p id="watermark-copy" class="small"></p>
+                <p class="small">Holder rebate preview: <span id="rebate-copy">Leave the end card on for a small paid-tier rebate.</span></p>
+              </div>
+            </div>
+
+            <div class="section-block">
+              <p class="section-title">Platform metadata</p>
+              <input id="title-input" class="text-input" type="text" placeholder="Video title">
+              <textarea id="description-input" class="text-area compact" placeholder="Description"></textarea>
+              <input id="tags-input" class="text-input" type="text" placeholder="tags, comma, separated">
+            </div>
           </div>
 
           <div class="action-row">

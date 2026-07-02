@@ -83,6 +83,18 @@
     return real.artifacts.map((artifact) => ({ ...artifact, downloadUrl: `${real.baseUrl}/${artifact.fileName}` }));
   }
 
+  // Basic mode (the default) hides Output preset / Caption style / Brand
+  // kit / Platform metadata and just assumes these values, so a first-time
+  // user isn't asked to make five decisions before creating anything.
+  // Advanced mode reveals all of them, unchanged from before.
+  const BASIC_MODE_DEFAULTS = {
+    preset: 'youtube',
+    subtitleStyle: 'clean_podcast',
+    brandEndCard: true,
+    madeWithCast: true,
+    archiveToIpfs: false,
+  };
+
   const els = {
     connectWallet: document.querySelector('#connect-wallet'),
     getE3dLink: document.querySelector('#get-e3d-link'),
@@ -92,6 +104,9 @@
     creditKeyLabel: document.querySelector('#credit-key-label'),
     activeTier: document.querySelector('#active-tier'),
     freeAttempts: document.querySelector('#free-attempts'),
+    workspaceModeToggle: document.querySelector('#workspace-mode-toggle'),
+    workspaceModeCopy: document.querySelector('#workspace-mode-copy'),
+    advancedOptions: document.querySelector('#advanced-options'),
     inputModeTabs: document.querySelector('#input-mode-tabs'),
     inputModePanel: document.querySelector('#input-mode-panel'),
     presetGrid: document.querySelector('#preset-grid'),
@@ -133,6 +148,7 @@
     creditKey: '',
     creditBalance: null,
     holderDiscountApplied: false,
+    workspaceMode: 'basic',
     mode: 'transcript',
     preset: 'transcript_short',
     subtitleStyle: 'bold_mobile',
@@ -169,6 +185,7 @@
       wallet: state.wallet,
       creditKey: state.creditKey,
       holderDiscountApplied: state.holderDiscountApplied,
+      workspaceMode: state.workspaceMode,
       mode: state.mode,
       preset: state.preset,
       subtitleStyle: state.subtitleStyle,
@@ -422,6 +439,26 @@
     els.tokenBalances.innerHTML = `E3D&nbsp;<strong>${fmt(tb.e3d)}</strong>&ensp;·&ensp;Base wE3D&nbsp;<strong>${fmt(tb.we3d)}</strong>`;
   }
 
+  // Sample mode already assigns preset/subtitleStyle per selected sample
+  // (see the sample gallery click handler in renderInputPanel) -- basic
+  // mode must not fight that assignment, so it only forces its own
+  // defaults for the real creation flows (upload/url/transcript).
+  function applyWorkspaceModeDefaults() {
+    if (state.workspaceMode !== 'basic' || state.mode === 'sample') return;
+    Object.assign(state, BASIC_MODE_DEFAULTS);
+  }
+
+  function renderWorkspaceMode() {
+    applyWorkspaceModeDefaults();
+    els.workspaceModeToggle.querySelectorAll('[data-workspace-mode]').forEach((button) => {
+      button.classList.toggle('active', button.dataset.workspaceMode === state.workspaceMode);
+    });
+    els.advancedOptions.hidden = state.workspaceMode === 'basic';
+    els.workspaceModeCopy.textContent = state.workspaceMode === 'basic'
+      ? 'Basic assumes YouTube preset, clean podcast captions, end card and Made with Cast rebate on, no IPFS archive. Switch to Advanced to change any of that.'
+      : 'Advanced shows every option: output preset, caption style, brand kit, and platform metadata.';
+  }
+
   function renderModeTabs() {
     els.inputModeTabs.innerHTML = modes.map((mode) => `
       <button class="mode-button ${mode.id === state.mode ? 'active' : ''}" data-mode="${mode.id}">
@@ -592,6 +629,15 @@
   }
 
   function renderBrandKitCopy() {
+    // Basic mode forces brandEndCard/madeWithCast/archiveToIpfs (see
+    // applyWorkspaceModeDefaults) -- these checkboxes were previously only
+    // ever synced once at init(), so without re-syncing here they'd show
+    // stale values after a forced change (e.g. toggle off in Advanced,
+    // switch to Basic and back to Advanced -- state is true again but the
+    // checkbox would still show unchecked).
+    els.brandEndCard.checked = state.brandEndCard;
+    els.madeWithToggle.checked = state.madeWithCast;
+    els.archiveToggle.checked = state.archiveToIpfs;
     const watermarkOn = currentTier() === 'free' || state.mode === 'sample';
     els.watermarkCopy.textContent = watermarkOn
       ? 'Free/sample renders show the Cast watermark and a 24-hour retention window.'
@@ -1296,10 +1342,14 @@ ${Object.keys(archive).length ? `\n${JSON.stringify(archive, null, 2)}` : '\nCon
     els.titleInput.value = state.title;
     els.descriptionInput.value = state.description;
     els.tagsInput.value = state.tags;
-    els.brandEndCard.checked = state.brandEndCard;
-    els.madeWithToggle.checked = state.madeWithCast;
-    els.archiveToggle.checked = state.archiveToIpfs;
 
+    els.workspaceModeToggle.querySelectorAll('[data-workspace-mode]').forEach((button) => {
+      button.addEventListener('click', () => {
+        state.workspaceMode = button.dataset.workspaceMode;
+        persistState();
+        render();
+      });
+    });
     els.connectWallet.addEventListener('click', connectWallet);
     els.loadWalletJobs.addEventListener('click', async () => {
       const original = els.loadWalletJobs.textContent;
@@ -1355,6 +1405,7 @@ ${Object.keys(archive).length ? `\n${JSON.stringify(archive, null, 2)}` : '\nCon
   }
 
   function render() {
+    renderWorkspaceMode();
     renderModeTabs();
     renderInputPanel();
     renderPresetGrid();
