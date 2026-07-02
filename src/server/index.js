@@ -261,4 +261,5 @@ module.exports = {
   createServer,
   handleUpload,
   loadDotEnv,
+  proxyHeaders,
 };
