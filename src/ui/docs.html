@@ -1,0 +1,174 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>Cast Docs</title>
+    <link rel="icon" type="image/x-icon" href="/favicon.ico">
+    <link rel="icon" type="image/png" sizes="32x32" href="/e3d_logo_32.png">
+    <link rel="stylesheet" href="/styles.css?v=7">
+    <style>
+      .agent-page { max-width: 860px; margin: 0 auto; padding: 40px 24px; }
+      .back-link { display: inline-block; margin-bottom: 28px; color: var(--muted); text-decoration: none; font-size: 0.9rem; }
+      .back-link:hover { color: var(--ink); }
+      .section-divider { border: none; border-top: 1px solid var(--line); margin: 32px 0; }
+      .docs-table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 0.92rem; }
+      .docs-table th, .docs-table td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
+      .docs-table th { color: var(--muted); font-size: 0.78rem; letter-spacing: 0.06em; text-transform: uppercase; }
+      .toc { display: grid; gap: 6px; margin: 16px 0; }
+      .toc a { color: var(--ink); text-decoration: none; }
+      .toc a:hover { text-decoration: underline; }
+    </style>
+  </head>
+  <body>
+    <div class="agent-page">
+      <a href="/" class="back-link">← Back to Cast</a>
+      <h1><img src="/e3d_logo_200.png" alt="E3D" class="title-logo">Cast Docs <span class="powered-by">(powered by E3D)</span></h1>
+      <p class="subhead">What every control in the workspace does, and the order you'd normally use them in.</p>
+
+      <nav class="toc">
+        <a href="#workflow">1. How Cast works, end to end</a>
+        <a href="#modes">2. Basic vs Advanced</a>
+        <a href="#input">3. Choosing an input</a>
+        <a href="#preset">4. Output preset</a>
+        <a href="#style">5. Caption style</a>
+        <a href="#brand-kit">6. Brand kit</a>
+        <a href="#metadata">7. Platform metadata</a>
+        <a href="#quote-create">8. Quoting and creating a video</a>
+        <a href="#wallet-credits">9. Wallet and credits</a>
+        <a href="#jobs">10. Recent jobs and job detail</a>
+        <a href="#free">11. Free sample attempts</a>
+      </nav>
+
+      <hr class="section-divider">
+
+      <h2 id="workflow">1. How Cast works, end to end</h2>
+      <p>Cast is a quote-first API: nothing spends credits until you explicitly submit a job, and submitting always happens after you've seen a price. The loop is:</p>
+      <p><strong>Set up the job</strong> (pick an input and, in Advanced mode, a preset/style/brand kit) → <strong>Get a quote</strong> (free, no wallet required) → <strong>Create Video</strong> (connects your wallet and buys credits automatically if you don't have enough, then submits) → <strong>track it</strong> in Recent jobs, where you can open artifacts, request revisions, or archive to IPFS once it finishes.</p>
+      <p>Everything in the workspace exists to fill in one of two things before you submit: <em>what to render</em> (input, preset, style, brand kit, metadata) and <em>how to pay</em> (wallet, credits).</p>
+
+      <hr class="section-divider">
+
+      <h2 id="modes">2. Basic vs Advanced</h2>
+      <p>The toggle at the top of the workspace switches how much of the form is visible:</p>
+      <table class="docs-table">
+        <thead><tr><th>Mode</th><th>What it does</th></tr></thead>
+        <tbody>
+          <tr>
+            <td><strong>Basic</strong> (default)</td>
+            <td>Hides Output preset, Caption style, Brand kit, and Platform metadata, and assumes sensible defaults: YouTube preset, clean podcast captions, end card on, Made with Cast rebate on, no IPFS archive. You only choose an input and submit.</td>
+          </tr>
+          <tr>
+            <td><strong>Advanced</strong></td>
+            <td>Reveals every option below so you can change the preset, caption style, brand kit toggles, and title/description/tags before submitting.</td>
+          </tr>
+        </tbody>
+      </table>
+      <p class="small">Switching modes doesn't lose anything — Advanced just shows what Basic already set. This is a display preference, not tied to your wallet, so it survives disconnecting.</p>
+
+      <hr class="section-divider">
+
+      <h2 id="input">3. Choosing an input</h2>
+      <p>The four tabs above the form determine what Cast turns into a video:</p>
+      <table class="docs-table">
+        <thead><tr><th>Tab</th><th>What it does</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Upload</strong></td><td>Choose a local audio/video file. It's registered with the upload helper and uploaded before you can quote or submit — wait for the progress bar to finish.</td></tr>
+          <tr><td><strong>Source URL</strong></td><td>Paste a public media URL. Cast fetches it on the server side rather than requiring you to download and re-upload it yourself.</td></tr>
+          <tr><td><strong>Transcript</strong></td><td>Paste text directly — no audio file needed. Cast synthesizes narration for the full transcript, so cost scales with how much text you paste (see the <a href="/pricing.html">pricing page</a> for the surcharge). This is the default tab.</td></tr>
+          <tr><td><strong>Sample</strong></td><td>Pick one of three public sample recordings to try the pipeline without providing your own input. Pairs with the <a href="#free">Try free render</a> button below.</td></tr>
+        </tbody>
+      </table>
+      <p class="small">Switching between Upload/Source URL (audio-driven) and Transcript/Sample (text-driven) automatically swaps the output preset to its equivalent, so you don't end up with a mismatched preset/input combination.</p>
+
+      <hr class="section-divider">
+
+      <h2 id="preset">4. Output preset <span class="small">(Advanced)</span></h2>
+      <table class="docs-table">
+        <thead><tr><th>Preset</th><th>Aspect</th><th>Best for</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Short</strong></td><td>9:16</td><td>Mobile-first clips with captions and watermark-aware defaults.</td></tr>
+          <tr><td><strong>YouTube video</strong></td><td>16:9</td><td>Longer-form widescreen package with metadata and a thumbnail. Basic mode's default.</td></tr>
+          <tr><td><strong>Transcript video</strong></td><td>16:9</td><td>Narrated or caption-led packaging for desktop video, built from pasted transcript text.</td></tr>
+          <tr><td><strong>Transcript short</strong></td><td>9:16</td><td>Fast transcript-to-short flow across all six caption styles.</td></tr>
+        </tbody>
+      </table>
+
+      <hr class="section-divider">
+
+      <h2 id="style">5. Caption style <span class="small">(Advanced)</span></h2>
+      <p>Six built-in caption treatments: <strong>Clean podcast</strong>, <strong>Bold mobile</strong>, <strong>Finance signal</strong>, <strong>Developer demo</strong>, <strong>News brief</strong>, and <strong>Minimal subtitles</strong>. Pick whichever best matches the tone of the source — this only affects how captions are styled on screen, not the render pipeline used.</p>
+
+      <hr class="section-divider">
+
+      <h2 id="brand-kit">6. Brand kit <span class="small">(Advanced)</span></h2>
+      <table class="docs-table">
+        <thead><tr><th>Toggle</th><th>What it does</th></tr></thead>
+        <tbody>
+          <tr><td><strong>End card enabled</strong></td><td>Appends a branded end card to the render.</td></tr>
+          <tr><td><strong>Made with Cast rebate enabled</strong></td><td>Keeps a small "Made with Cast" credit on the video in exchange for a rebate on paid-tier jobs. Turning it off removes the credit and the rebate.</td></tr>
+          <tr><td><strong>Archive to IPFS after completion</strong></td><td>Automatically archives finished artifacts to IPFS instead of (or in addition to) doing it manually from Job Detail afterward. Costs extra credits — see <a href="/pricing.html">pricing</a>.</td></tr>
+        </tbody>
+      </table>
+      <p class="small">On the Free/Starter tier, or when using the Sample input tab, renders always carry the Cast watermark regardless of these toggles — watermark removal is a paid-tier benefit.</p>
+
+      <hr class="section-divider">
+
+      <h2 id="metadata">7. Platform metadata <span class="small">(Advanced)</span></h2>
+      <p>Title, description, and comma-separated tags attached to the finished job — used to populate the <code>metadata.json</code> and social-copy artifacts you can download from Job Detail once a render finishes. Purely descriptive; they don't change how the video renders.</p>
+
+      <hr class="section-divider">
+
+      <h2 id="quote-create">8. Quoting and creating a video</h2>
+      <table class="docs-table">
+        <thead><tr><th>Button</th><th>What it does</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Get quote</strong></td><td>Prices the job as currently configured — expected render time, artifact size, credit cost, and tier fit. Always free, never spends credits, no wallet required.</td></tr>
+          <tr>
+            <td><strong>Create Video</strong></td>
+            <td>Submits the job for real. If you're not connected, it connects your wallet first; if you don't have enough credits, it quotes a credit purchase, has you confirm and send the payment from your wallet, registers the purchase once it confirms on-chain, and then submits — all from one click. If you already have enough credits, it just submits.</td>
+          </tr>
+          <tr><td><strong>Try free render</strong></td><td>Runs a local, no-wallet-needed demo using one of the three public sample recordings instead of calling the paid API. See <a href="#free">Free sample attempts</a>.</td></tr>
+        </tbody>
+      </table>
+      <p class="small">The Spend preview panel next to the form always reflects your most recent quote — expected render time, estimated artifact size, discount status, and retention window.</p>
+
+      <hr class="section-divider">
+
+      <h2 id="wallet-credits">9. Wallet and credits</h2>
+      <p><strong>Connect Wallet</strong> (top right) prompts your injected wallet (e.g. MetaMask) for an account, or asks you to paste an address if none is installed. Once connected, Cast automatically loads that wallet's job history into Recent jobs, and checks whether it qualifies for the <strong>20% holder discount</strong> on credit purchases.</p>
+      <p>Clicking the same button again <strong>disconnects</strong> and resets the workspace to its defaults — credit key, job history, and everything you'd filled into the form — so a different wallet doesn't inherit the previous session's data. (Basic/Advanced mode is the one thing that's preserved, since it's a display preference rather than wallet-specific state.)</p>
+      <p>The <strong>Payments</strong> panel buys credits by hand, which is also what Create Video's auto-pay does internally:</p>
+      <ol>
+        <li><strong>Quote credit purchase</strong> — enter how many credits you want and get a price in E3D or wE3D.</li>
+        <li>Send that payment from your own wallet (outside Cast) to the treasury address shown in the quote.</li>
+        <li><strong>Register purchase</strong> — paste the transaction hash and pick the payment method used, so Cast can verify it on-chain and issue a credit key.</li>
+        <li><strong>Refresh balance</strong> — re-checks your current credit balance at any time.</li>
+      </ol>
+      <p class="small"><strong>Ethereum E3D</strong> is the native token on Ethereum mainnet. <strong>Base wE3D</strong> is wrapped E3D bridged to Base — faster and cheaper to send, preferred for agent automation. Both settle credits at the same rate. Full breakdown in the <em>ℹ</em> icon next to Payments, or the <a href="/pricing.html">pricing page</a>.</p>
+
+      <hr class="section-divider">
+
+      <h2 id="jobs">10. Recent jobs and job detail</h2>
+      <p>Every job you submit (or load via a connected wallet) appears as one row — title on the left, status/tier/input kind on the right. <strong>Click anywhere on a row to open it</strong> in Job Detail below.</p>
+      <p>Job Detail shows the job's artifacts (video, captions, thumbnail, metadata, social copy — button label adapts to type: "Play video," "View transcript," or "Open artifact"), plus three actions:</p>
+      <table class="docs-table">
+        <thead><tr><th>Action</th><th>What it does</th></tr></thead>
+        <tbody>
+          <tr><td><strong>Revision: thumbnail / metadata / subtitle style</strong></td><td>Creates a cheaper child job that only redoes that one piece, instead of a full re-render.</td></tr>
+          <tr><td><strong>Archive to IPFS</strong></td><td>Pins the finished artifacts to IPFS. Requires explicit consent (this button) unless the Brand kit's "Archive to IPFS after completion" toggle already did it automatically.</td></tr>
+        </tbody>
+      </table>
+      <p class="small">"Load my jobs" (next to Recent jobs) re-fetches a connected wallet's full job history on demand — the same thing that happens automatically right after connecting.</p>
+
+      <hr class="section-divider">
+
+      <h2 id="free">11. Free sample attempts</h2>
+      <p>The Tier status card shows <strong>free sample attempts remaining</strong> — up to 3. Each counts down when you click <strong>Try free render</strong> on the Sample input tab. These are local, no-wallet, no-cost demo renders built from Cast's own public sample recordings, meant to show what a finished render looks like before you spend anything real. Once the free samples don't tell you what you need, quote a real job with your own input.</p>
+
+      <hr class="section-divider">
+
+      <p class="small">Building against the API instead of the UI? See the <a href="/agent.html">API docs</a>. For exact costs and tier limits, see <a href="/pricing.html">pricing</a>. For example output, see the <a href="/gallery.html">gallery</a>.</p>
+    </div>
+  </body>
+</html>
