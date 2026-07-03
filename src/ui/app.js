@@ -1136,8 +1136,11 @@ ${Object.keys(archive).length ? `\n${JSON.stringify(archive, null, 2)}` : '\nCon
       els.quotePanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       return;
     }
-    // Ethereum E3D default for now — Base wE3D has no liquidity pool yet.
-    const paymentOption = purchaseQuote.paymentOptions.find((option) => option.id === 'ethereum-e3d') || purchaseQuote.paymentOptions[0];
+    // Respect the Payments panel's payment-method choice (also used by the
+    // manual registerPurchase flow) so auto-pay and manual purchases always
+    // agree on which token gets used. Falls back to whatever the quote
+    // actually offers if the selected method isn't in that list.
+    const paymentOption = purchaseQuote.paymentOptions.find((option) => option.id === els.paymentMethod.value) || purchaseQuote.paymentOptions[0];
     if (!paymentOption) {
       els.quoteStatus.textContent = 'Create video failed';
       els.quotePanel.innerHTML = '<div class="manifest-box">No payment method is configured for Cast.</div>';
