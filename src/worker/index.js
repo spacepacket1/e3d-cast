@@ -121,6 +121,7 @@ async function buildWorkerManifest(job, config) {
       generateThumbnail: job.options && job.options.generateThumbnail === false ? false : true,
       brandEndCard: job.options && job.options.brandEndCard === false ? false : true,
       archiveToIpfs: !!(job.options && job.options.archiveToIpfs),
+      transcriptionEngine: (job.options && job.options.transcriptionEngine === 'local') ? 'local' : 'assemblyai',
     },
     brandKit: {
       endCard: job.options && job.options.brandEndCard === false ? false : true,

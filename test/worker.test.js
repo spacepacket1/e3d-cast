@@ -6,7 +6,33 @@ const os = require('os');
 const path = require('path');
 const test = require('node:test');
 
-const { processNextQueuedJob } = require('../src/worker/index.js');
+const { processNextQueuedJob, buildWorkerManifest } = require('../src/worker/index.js');
+
+test('buildWorkerManifest defaults transcriptionEngine to assemblyai and passes through "local"', async () => {
+  const baseJob = {
+    jobId: 'cast_job_engine_test',
+    inputKind: 'transcript',
+    outputPreset: 'youtube',
+    tier: 'starter',
+    options: { subtitleStyle: 'clean_podcast', transcriptText: 'Host: Hi.' },
+  };
+  const config = { storageDir: '/tmp/cast-test-storage' };
+
+  const defaultManifest = await buildWorkerManifest(baseJob, config);
+  assert.strictEqual(defaultManifest.options.transcriptionEngine, 'assemblyai');
+
+  const localManifest = await buildWorkerManifest(
+    { ...baseJob, options: { ...baseJob.options, transcriptionEngine: 'local' } },
+    config,
+  );
+  assert.strictEqual(localManifest.options.transcriptionEngine, 'local');
+
+  const bogusManifest = await buildWorkerManifest(
+    { ...baseJob, options: { ...baseJob.options, transcriptionEngine: 'deepgram' } },
+    config,
+  );
+  assert.strictEqual(bogusManifest.options.transcriptionEngine, 'assemblyai');
+});
 
 test('worker claims a queued job, runs the runner, and writes artifacts back to the API store', async () => {
   const tempDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cast-worker-'));

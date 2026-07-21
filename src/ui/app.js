@@ -163,6 +163,7 @@
       uploadBusy: false,
       uploadError: '',
       uploadProgress: 0,
+      transcriptionEngine: 'assemblyai',
       selectedSampleId: samples[0].id,
       title: 'Cast transcript short',
       description: 'Preview subtitle style, watermark state, metadata, and pricing before spend.',
@@ -199,6 +200,7 @@
       subtitleStyle: state.subtitleStyle,
       transcriptText: state.transcriptText,
       sourceUrl: state.sourceUrl,
+      transcriptionEngine: state.transcriptionEngine,
       selectedSampleId: state.selectedSampleId,
       title: state.title,
       description: state.description,
@@ -278,6 +280,7 @@
     return {
       dryRun: false,
       subtitleStyle: state.subtitleStyle,
+      transcriptionEngine: state.mode === 'upload' || state.mode === 'url' ? state.transcriptionEngine : 'assemblyai',
       brandEndCard: state.brandEndCard,
       archiveToIpfs: state.archiveToIpfs,
       transcriptText: state.transcriptText,
@@ -497,6 +500,31 @@
     return currentPreset;
   }
 
+  function transcriptionEngineBlock() {
+    return `
+      <div class="section-block">
+        <p class="section-title">Transcription</p>
+        <label class="toggle-row">
+          <input type="radio" name="transcription-engine" value="assemblyai" ${state.transcriptionEngine === 'local' ? '' : 'checked'}>
+          AssemblyAI — best quality, speaker labels, uses credits
+        </label>
+        <label class="toggle-row">
+          <input type="radio" name="transcription-engine" value="local" ${state.transcriptionEngine === 'local' ? 'checked' : ''}>
+          Free — local transcription, no speaker labels, lower accuracy
+        </label>
+      </div>
+    `;
+  }
+
+  function wireTranscriptionEngineBlock() {
+    document.querySelectorAll('input[name="transcription-engine"]').forEach((input) => {
+      input.addEventListener('change', (event) => {
+        state.transcriptionEngine = event.target.value;
+        persistState();
+      });
+    });
+  }
+
   function renderInputPanel() {
     if (state.mode === 'upload') {
       const statusText = state.uploadError
@@ -516,7 +544,9 @@
           ` : ''}
         </div>
         <div class="small">${statusText}</div>
+        ${transcriptionEngineBlock()}
       `;
+      wireTranscriptionEngineBlock();
       document.querySelector('#upload-file-button').addEventListener('click', async () => {
         const fileInput = document.querySelector('#upload-file');
         const file = fileInput.files && fileInput.files[0];
@@ -555,7 +585,9 @@
       els.inputModePanel.innerHTML = `
         <input id="source-url-input" class="text-input" type="url" placeholder="https://example.com/podcast.mp3" value="${state.sourceUrl}">
         <div class="small">Public HTTP(S) source only. The worker downloads this URL at dispatch time.</div>
+        ${transcriptionEngineBlock()}
       `;
+      wireTranscriptionEngineBlock();
       document.querySelector('#source-url-input').addEventListener('input', (event) => {
         state.sourceUrl = event.target.value;
         persistState();
