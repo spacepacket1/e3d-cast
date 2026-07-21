@@ -60,6 +60,41 @@
     },
   ];
 
+  // A real render from production (cast_job_9034809111fff54b) backing the
+  // "Audio to YouTube package" sample, instead of the synthetic SVG
+  // poster + JSON manifest the other samples still use. Served from
+  // /samples/* (public, unauthenticated, range-request capable -- see
+  // serveSampleAsset in src/server/index.js).
+  const REAL_SAMPLE_ASSETS = {
+    'sample-audio': {
+      baseUrl: '/samples/audio-youtube',
+      artifacts: [
+        { artifactId: 'video', type: 'mp4', contentType: 'video/mp4', bytes: 603400139, fileName: 'video.mp4' },
+        { artifactId: 'thumbnail', type: 'thumbnail', contentType: 'image/png', bytes: 25282, fileName: 'thumbnail.png' },
+        { artifactId: 'captions', type: 'srt', contentType: 'application/x-subrip', bytes: 28281, fileName: 'captions.srt' },
+        { artifactId: 'metadata', type: 'metadata', contentType: 'application/json', bytes: 351, fileName: 'metadata.json' },
+      ],
+    },
+  };
+
+  function realSampleArtifacts(sample) {
+    const real = REAL_SAMPLE_ASSETS[sample.id];
+    if (!real) return null;
+    return real.artifacts.map((artifact) => ({ ...artifact, downloadUrl: `${real.baseUrl}/${artifact.fileName}` }));
+  }
+
+  // Basic mode (the default) hides Output preset / Caption style / Brand
+  // kit / Platform metadata and just assumes these values, so a first-time
+  // user isn't asked to make five decisions before creating anything.
+  // Advanced mode reveals all of them, unchanged from before.
+  const BASIC_MODE_DEFAULTS = {
+    preset: 'youtube',
+    subtitleStyle: 'clean_podcast',
+    brandEndCard: true,
+    madeWithCast: true,
+    archiveToIpfs: false,
+  };
+
   const els = {
     connectWallet: document.querySelector('#connect-wallet'),
     getE3dLink: document.querySelector('#get-e3d-link'),
@@ -69,6 +104,9 @@
     creditKeyLabel: document.querySelector('#credit-key-label'),
     activeTier: document.querySelector('#active-tier'),
     freeAttempts: document.querySelector('#free-attempts'),
+    workspaceModeToggle: document.querySelector('#workspace-mode-toggle'),
+    workspaceModeCopy: document.querySelector('#workspace-mode-copy'),
+    advancedOptions: document.querySelector('#advanced-options'),
     inputModeTabs: document.querySelector('#input-mode-tabs'),
     inputModePanel: document.querySelector('#input-mode-panel'),
     presetGrid: document.querySelector('#preset-grid'),
@@ -79,11 +117,6 @@
     brandEndCard: document.querySelector('#brand-end-card'),
     madeWithToggle: document.querySelector('#made-with-toggle'),
     archiveToggle: document.querySelector('#archive-toggle'),
-    previewAspect: document.querySelector('#preview-aspect'),
-    previewCaption: document.querySelector('#preview-caption'),
-    previewWatermark: document.querySelector('#preview-watermark'),
-    previewTitle: document.querySelector('#preview-title'),
-    previewDescription: document.querySelector('#preview-description'),
     watermarkCopy: document.querySelector('#watermark-copy'),
     rebateCopy: document.querySelector('#rebate-copy'),
     submitState: document.querySelector('#submit-state'),
@@ -99,7 +132,6 @@
     paymentMethod: document.querySelector('#payment-method'),
     registerPurchase: document.querySelector('#register-purchase'),
     refreshBalance: document.querySelector('#refresh-balance'),
-    sampleGallery: document.querySelector('#sample-gallery'),
     jobsList: document.querySelector('#jobs-list'),
     loadWalletJobs: document.querySelector('#load-wallet-jobs'),
     jobDetail: document.querySelector('#job-detail'),
@@ -109,35 +141,44 @@
     dialogClose: document.querySelector('#dialog-close'),
   };
 
-  const state = Object.assign({
-    config: null,
-    capabilities: null,
-    wallet: '',
-    creditKey: '',
-    creditBalance: null,
-    holderDiscountApplied: false,
-    mode: 'transcript',
-    preset: 'transcript_short',
-    subtitleStyle: 'bold_mobile',
-    transcriptText: 'Host: Welcome to Cast.\nGuest: Today we are previewing a hosted render on E3D.',
-    sourceUrl: '',
-    upload: null,
-    uploadBusy: false,
-    uploadError: '',
-    uploadProgress: 0,
-    selectedSampleId: samples[0].id,
-    title: 'Cast transcript short',
-    description: 'Preview subtitle style, watermark state, metadata, and pricing before spend.',
-    tags: 'cast,e3d,transcript',
-    archiveToIpfs: false,
-    brandEndCard: true,
-    madeWithCast: true,
-    freeSampleAttemptsUsed: 0,
-    quote: null,
-    purchaseQuote: null,
-    jobs: [],
-    selectedJobId: '',
-  }, loadState());
+  // Shared by the initial state and by disconnectWallet()'s reset, so a
+  // fresh default and "back to defaults after disconnect" can never drift
+  // apart. workspaceMode is deliberately absent -- it's a UI preference
+  // ("how do I want to use this app"), not wallet/session content, so
+  // disconnecting shouldn't flip it back to Basic.
+  function createDefaultState() {
+    return {
+      config: null,
+      capabilities: null,
+      wallet: '',
+      creditKey: '',
+      creditBalance: null,
+      holderDiscountApplied: false,
+      mode: 'transcript',
+      preset: 'transcript_short',
+      subtitleStyle: 'bold_mobile',
+      transcriptText: 'Host: Welcome to Cast.\nGuest: Today we are previewing a hosted render on E3D.',
+      sourceUrl: '',
+      upload: null,
+      uploadBusy: false,
+      uploadError: '',
+      uploadProgress: 0,
+      selectedSampleId: samples[0].id,
+      title: 'Cast transcript short',
+      description: 'Preview subtitle style, watermark state, metadata, and pricing before spend.',
+      tags: 'cast,e3d,transcript',
+      archiveToIpfs: false,
+      brandEndCard: true,
+      madeWithCast: true,
+      freeSampleAttemptsUsed: 0,
+      quote: null,
+      purchaseQuote: null,
+      jobs: [],
+      selectedJobId: '',
+    };
+  }
+
+  const state = Object.assign(createDefaultState(), { workspaceMode: 'basic' }, loadState());
 
   function loadState() {
     try {
@@ -152,6 +193,7 @@
       wallet: state.wallet,
       creditKey: state.creditKey,
       holderDiscountApplied: state.holderDiscountApplied,
+      workspaceMode: state.workspaceMode,
       mode: state.mode,
       preset: state.preset,
       subtitleStyle: state.subtitleStyle,
@@ -184,6 +226,9 @@
   }
 
   function samplePoster(sample) {
+    if (REAL_SAMPLE_ASSETS[sample.id]) {
+      return `${REAL_SAMPLE_ASSETS[sample.id].baseUrl}/thumbnail.png`;
+    }
     const svg = `
       <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 800 450">
         <defs>
@@ -402,6 +447,26 @@
     els.tokenBalances.innerHTML = `E3D&nbsp;<strong>${fmt(tb.e3d)}</strong>&ensp;·&ensp;Base wE3D&nbsp;<strong>${fmt(tb.we3d)}</strong>`;
   }
 
+  // Sample mode already assigns preset/subtitleStyle per selected sample
+  // (see the sample gallery click handler in renderInputPanel) -- basic
+  // mode must not fight that assignment, so it only forces its own
+  // defaults for the real creation flows (upload/url/transcript).
+  function applyWorkspaceModeDefaults() {
+    if (state.workspaceMode !== 'basic' || state.mode === 'sample') return;
+    Object.assign(state, BASIC_MODE_DEFAULTS);
+  }
+
+  function renderWorkspaceMode() {
+    applyWorkspaceModeDefaults();
+    els.workspaceModeToggle.querySelectorAll('[data-workspace-mode]').forEach((button) => {
+      button.classList.toggle('active', button.dataset.workspaceMode === state.workspaceMode);
+    });
+    els.advancedOptions.hidden = state.workspaceMode === 'basic';
+    els.workspaceModeCopy.textContent = state.workspaceMode === 'basic'
+      ? 'Basic assumes YouTube preset, clean podcast captions, end card and Made with Cast rebate on, no IPFS archive. Switch to Advanced to change any of that.'
+      : 'Advanced shows every option: output preset, caption style, brand kit, and platform metadata.';
+  }
+
   function renderModeTabs() {
     els.inputModeTabs.innerHTML = modes.map((mode) => `
       <button class="mode-button ${mode.id === state.mode ? 'active' : ''}" data-mode="${mode.id}">
@@ -535,7 +600,6 @@
     document.querySelector('#transcript-input').addEventListener('input', (event) => {
       state.transcriptText = event.target.value;
       persistState();
-      renderPreview();
       renderInputPanel();
     });
   }
@@ -567,20 +631,34 @@
       button.addEventListener('click', () => {
         state.subtitleStyle = button.dataset.style;
         persistState();
-        renderPreview();
         renderStyleGrid();
       });
     });
   }
 
-  function renderPreview() {
-    const preset = presets.find((entry) => entry.id === state.preset) || presets[0];
+  function renderPlatformMetadataInputs() {
+    // Same staleness class as the brand-kit checkboxes above: these were
+    // only ever synced once at init(), so disconnectWallet()'s reset (or
+    // any other programmatic state change) wouldn't show up here. Safe to
+    // re-sync on every render() -- the title/description/tags "input"
+    // listeners only call persistState(), never render(), so this can't
+    // clobber what someone is actively typing.
+    els.titleInput.value = state.title;
+    els.descriptionInput.value = state.description;
+    els.tagsInput.value = state.tags;
+  }
+
+  function renderBrandKitCopy() {
+    // Basic mode forces brandEndCard/madeWithCast/archiveToIpfs (see
+    // applyWorkspaceModeDefaults) -- these checkboxes were previously only
+    // ever synced once at init(), so without re-syncing here they'd show
+    // stale values after a forced change (e.g. toggle off in Advanced,
+    // switch to Basic and back to Advanced -- state is true again but the
+    // checkbox would still show unchecked).
+    els.brandEndCard.checked = state.brandEndCard;
+    els.madeWithToggle.checked = state.madeWithCast;
+    els.archiveToggle.checked = state.archiveToIpfs;
     const watermarkOn = currentTier() === 'free' || state.mode === 'sample';
-    els.previewAspect.textContent = preset.aspect;
-    els.previewCaption.textContent = `${styles.find((entry) => entry.id === state.subtitleStyle).title} captions preview`;
-    els.previewWatermark.textContent = watermarkOn ? 'cast.e3d.ai' : 'Made with Cast';
-    els.previewTitle.textContent = state.title || 'Cast preview title';
-    els.previewDescription.textContent = state.description || 'Description preview';
     els.watermarkCopy.textContent = watermarkOn
       ? 'Free/sample renders show the Cast watermark and a 24-hour retention window.'
       : 'Paid tiers remove the watermark. End card stays on by default for a small rebate.';
@@ -651,38 +729,22 @@
     `;
   }
 
-  function renderSamples() {
-    els.sampleGallery.innerHTML = samples.map((sample) => `
-      <article class="sample-card">
-        <img src="${samplePoster(sample)}" alt="${sample.title}">
-        <strong>${sample.title}</strong>
-        <p>${sample.description}</p>
-        <div class="chip-row">
-          <span class="chip">${sample.inputKind}</span>
-          <span class="chip">${sample.preset}</span>
-          <span class="chip">${sample.aspect}</span>
-        </div>
-        <p class="small">${sample.outputSummary}</p>
-      </article>
-    `).join('');
-  }
-
   function renderJobs() {
     if (!state.jobs.length) {
       els.jobsList.innerHTML = '<div class="empty-state">Recent jobs stay here for resume, revision, archive, and artifact download.</div>';
       return;
     }
     els.jobsList.innerHTML = state.jobs.map((job) => `
-      <article class="job-card">
+      <button class="job-row ${job.jobId === state.selectedJobId ? 'active' : ''}" data-job="${job.jobId}">
         <strong>${job.title || job.jobId}</strong>
-        <p>${job.status} • ${job.tier || 'free'} • ${job.source || job.inputKind}</p>
-        <button class="button ghost" data-job="${job.jobId}">Open</button>
-      </article>
+        <span class="small">${job.status} • ${job.tier || 'free'} • ${job.source || job.inputKind}</span>
+      </button>
     `).join('');
     els.jobsList.querySelectorAll('[data-job]').forEach((button) => {
       button.addEventListener('click', async () => {
         state.selectedJobId = button.dataset.job;
         persistState();
+        renderJobs();
         const job = selectedJob();
         if (job && job.kind !== 'local-sample' && !job.remoteStatus && (state.creditKey || walletProofIsFresh())) {
           try {
@@ -739,6 +801,19 @@
     const preview = document.querySelector('#artifact-preview');
     if (!preview) return;
     preview.hidden = false;
+    // Public sample video is served directly from a static, unauthenticated
+    // URL (/samples/*) with Range support, so the browser can stream/seek it
+    // natively -- pulling all ~600MB through fetch()+Blob just to play it
+    // would be slow and needlessly memory-heavy.
+    if (job.kind === 'local-sample' && artifact.contentType === 'video/mp4') {
+      preview.textContent = '';
+      const video = document.createElement('video');
+      video.controls = true;
+      video.style.maxWidth = '100%';
+      video.src = artifact.downloadUrl;
+      preview.appendChild(video);
+      return;
+    }
     preview.textContent = `Loading ${artifact.artifactId}…`;
     try {
       const blob = await fetchArtifactBlob(job, artifact);
@@ -777,7 +852,7 @@
             <strong>${artifact.artifactId}</strong>
             <div class="small">${artifact.type || artifact.contentType}</div>
             <div class="small">${formatBytes(artifact.bytes || artifact.sizeBytes || 0)}</div>
-            <button class="button ghost" data-open-artifact="${artifact.artifactId}">${TEXT_ARTIFACT_TYPES.has(artifact.contentType) ? 'View transcript' : 'Open artifact'}</button>
+            <button class="button ghost" data-open-artifact="${artifact.artifactId}">${TEXT_ARTIFACT_TYPES.has(artifact.contentType) ? 'View transcript' : artifact.contentType === 'video/mp4' ? 'Play video' : 'Open artifact'}</button>
           </article>
         `).join('')}
       </div>
@@ -1061,8 +1136,11 @@ ${Object.keys(archive).length ? `\n${JSON.stringify(archive, null, 2)}` : '\nCon
       els.quotePanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       return;
     }
-    // Ethereum E3D default for now — Base wE3D has no liquidity pool yet.
-    const paymentOption = purchaseQuote.paymentOptions.find((option) => option.id === 'ethereum-e3d') || purchaseQuote.paymentOptions[0];
+    // Respect the Payments panel's payment-method choice (also used by the
+    // manual registerPurchase flow) so auto-pay and manual purchases always
+    // agree on which token gets used. Falls back to whatever the quote
+    // actually offers if the selected method isn't in that list.
+    const paymentOption = purchaseQuote.paymentOptions.find((option) => option.id === els.paymentMethod.value) || purchaseQuote.paymentOptions[0];
     if (!paymentOption) {
       els.quoteStatus.textContent = 'Create video failed';
       els.quotePanel.innerHTML = '<div class="manifest-box">No payment method is configured for Cast.</div>';
@@ -1196,7 +1274,7 @@ ${Object.keys(archive).length ? `\n${JSON.stringify(archive, null, 2)}` : '\nCon
       tier: 'free',
       preset: sample.preset,
       inputKind: sample.inputKind,
-      artifacts: [
+      artifacts: realSampleArtifacts(sample) || [
         { artifactId: 'preview_frame', type: 'image/svg+xml', bytes: 1200, downloadUrl: samplePoster(sample) },
         { artifactId: 'manifest', type: 'application/json', bytes: 950, downloadUrl: `data:application/json,${encodeURIComponent(JSON.stringify(sample, null, 2))}` },
       ],
@@ -1259,15 +1337,25 @@ ${Object.keys(archive).length ? `\n${JSON.stringify(archive, null, 2)}` : '\nCon
     renderJobDetail();
   }
 
+  async function disconnectWallet() {
+    // Credit key, jobs, and every creation-form field are either
+    // wallet-specific (credit key, job history) or just leftover scratch
+    // state from the last session -- carrying them over to whatever
+    // wallet connects next showed a confusing mix of two people's data.
+    // workspaceMode is the one exception (see createDefaultState) --
+    // that's a UI preference, not session content.
+    Object.assign(state, createDefaultState(), { workspaceMode: state.workspaceMode });
+    state.tokenBalances = null;
+    walletProof = null;
+    // Not part of `state` (read directly from the DOM at submit time) but
+    // still a payment tx hash tied to whoever was just connected.
+    els.txHash.value = '';
+    persistState();
+    render();
+  }
+
   async function connectWallet() {
-    if (state.wallet) {
-      state.wallet = '';
-      state.tokenBalances = null;
-      persistState();
-      renderStatus();
-      renderTokenBalances();
-      return;
-    }
+    if (state.wallet) return disconnectWallet();
     if (window.ethereum && window.ethereum.request) {
       await window.ethereum.request({ method: 'wallet_requestPermissions', params: [{ eth_accounts: {} }] });
       const accounts = await window.ethereum.request({ method: 'eth_accounts' });
@@ -1276,21 +1364,30 @@ ${Object.keys(archive).length ? `\n${JSON.stringify(archive, null, 2)}` : '\nCon
       state.wallet = window.prompt('Enter a wallet address') || '';
     }
     persistState();
-    renderStatus();
+    render();
     fetchTokenBalances();
+    if (state.wallet) {
+      // Best-effort: reload this wallet's job history automatically, same
+      // as clicking "Load my jobs". Silent on failure/rejection (e.g. no
+      // injected wallet to sign with, or the user dismisses the signature
+      // prompt) -- connecting still succeeds either way, and "Load my
+      // jobs" remains available to retry by hand.
+      loadJobsForWallet().catch(() => {});
+    }
   }
 
   async function init() {
     state.config = await apiJson('/ui-api/config');
     state.capabilities = await apiJson('/api/cast/capabilities');
     els.getE3dLink.href = state.config.getE3dUrl;
-    els.titleInput.value = state.title;
-    els.descriptionInput.value = state.description;
-    els.tagsInput.value = state.tags;
-    els.brandEndCard.checked = state.brandEndCard;
-    els.madeWithToggle.checked = state.madeWithCast;
-    els.archiveToggle.checked = state.archiveToIpfs;
 
+    els.workspaceModeToggle.querySelectorAll('[data-workspace-mode]').forEach((button) => {
+      button.addEventListener('click', () => {
+        state.workspaceMode = button.dataset.workspaceMode;
+        persistState();
+        render();
+      });
+    });
     els.connectWallet.addEventListener('click', connectWallet);
     els.loadWalletJobs.addEventListener('click', async () => {
       const original = els.loadWalletJobs.textContent;
@@ -1316,11 +1413,11 @@ ${Object.keys(archive).length ? `\n${JSON.stringify(archive, null, 2)}` : '\nCon
     els.paymentsInfo.addEventListener('click', () => els.paymentsInfoDialog.showModal());
     els.dialogClose.addEventListener('click', () => els.paymentsInfoDialog.close());
     els.paymentsInfoDialog.addEventListener('click', (e) => { if (e.target === els.paymentsInfoDialog) els.paymentsInfoDialog.close(); });
-    els.titleInput.addEventListener('input', (event) => { state.title = event.target.value; persistState(); renderPreview(); });
-    els.descriptionInput.addEventListener('input', (event) => { state.description = event.target.value; persistState(); renderPreview(); });
+    els.titleInput.addEventListener('input', (event) => { state.title = event.target.value; persistState(); });
+    els.descriptionInput.addEventListener('input', (event) => { state.description = event.target.value; persistState(); });
     els.tagsInput.addEventListener('input', (event) => { state.tags = event.target.value; persistState(); });
-    els.brandEndCard.addEventListener('change', (event) => { state.brandEndCard = event.target.checked; persistState(); renderPreview(); });
-    els.madeWithToggle.addEventListener('change', (event) => { state.madeWithCast = event.target.checked; persistState(); renderPreview(); });
+    els.brandEndCard.addEventListener('change', (event) => { state.brandEndCard = event.target.checked; persistState(); });
+    els.madeWithToggle.addEventListener('change', (event) => { state.madeWithCast = event.target.checked; persistState(); renderBrandKitCopy(); });
     els.archiveToggle.addEventListener('change', (event) => { state.archiveToIpfs = event.target.checked; persistState(); });
 
     if (state.creditKey) {
@@ -1346,15 +1443,16 @@ ${Object.keys(archive).length ? `\n${JSON.stringify(archive, null, 2)}` : '\nCon
   }
 
   function render() {
+    renderWorkspaceMode();
     renderModeTabs();
     renderInputPanel();
     renderPresetGrid();
     renderStyleGrid();
     renderStatus();
-    renderPreview();
+    renderPlatformMetadataInputs();
+    renderBrandKitCopy();
     renderQuotePanel();
     renderPurchaseQuote();
-    renderSamples();
     renderJobs();
     renderJobDetail();
     renderTokenBalances();

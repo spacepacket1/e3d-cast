@@ -175,3 +175,72 @@ test('forwardServiceCall never relays Origin or Connection to the upstream API',
     await close(upstream);
   }
 });
+
+test('/samples/* serves public assets with Range support and rejects path traversal', async () => {
+  const uiDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cast-ui-'));
+  const uploadDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cast-upload-'));
+  const publicSamplesDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cast-samples-'));
+  const secretDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cast-secret-'));
+  fs.writeFileSync(path.join(secretDir, 'private.txt'), 'should never be served');
+
+  const content = Buffer.from('0123456789'.repeat(10)); // 100 bytes, easy to slice by hand
+  fs.writeFileSync(path.join(publicSamplesDir, 'clip.mp4'), content);
+
+  const server = createServer({ rootDir: uiDir, uiDir, uploadDir, publicSamplesDir });
+  const port = await listen(server);
+
+  try {
+    // Full file, no Range header.
+    const full = await rawHttpRequest(`http://127.0.0.1:${port}/samples/clip.mp4`);
+    assert.strictEqual(full.statusCode, 200);
+    assert.strictEqual(Buffer.byteLength(full.body), content.length);
+
+    // A specific byte range.
+    const ranged = await rawHttpRequest(`http://127.0.0.1:${port}/samples/clip.mp4`, {
+      headers: { range: 'bytes=10-19' },
+    });
+    assert.strictEqual(ranged.statusCode, 206);
+    assert.strictEqual(ranged.body, content.slice(10, 20).toString());
+
+    // Open-ended range (from byte 90 to the end).
+    const openEnded = await rawHttpRequest(`http://127.0.0.1:${port}/samples/clip.mp4`, {
+      headers: { range: 'bytes=90-' },
+    });
+    assert.strictEqual(openEnded.statusCode, 206);
+    assert.strictEqual(openEnded.body, content.slice(90).toString());
+
+    // A range past the end of the file must be rejected, not silently clamped.
+    const outOfRange = await rawHttpRequest(`http://127.0.0.1:${port}/samples/clip.mp4`, {
+      headers: { range: 'bytes=200-300' },
+    });
+    assert.strictEqual(outOfRange.statusCode, 416);
+
+    // Traversal attempts must never escape publicSamplesDir. Both payloads
+    // are constructed to survive Node's URL parser unmangled (it decodes
+    // literal ".." segments itself -- e.g. /samples/%2e%2e/x collapses to
+    // /x before this code ever runs, so that spelling wouldn't actually
+    // exercise our own check at all). Don't just trust that a browser,
+    // curl, or the URL parser would neutralize it -- prove the server's
+    // own resolved.startsWith(root) guard rejects it and never returns the
+    // secret file's contents.
+    //
+    // publicSamplesDir and secretDir are sibling temp dirs (both direct
+    // children of the OS tmpdir), so exactly one ".." reaches the parent.
+    const encodedDotDot = await rawHttpRequest(`http://127.0.0.1:${port}/samples/..%2f${path.basename(secretDir)}/private.txt`);
+    assert.notStrictEqual(encodedDotDot.statusCode, 200);
+    assert.ok(!encodedDotDot.body.includes('should never be served'));
+
+    // path.resolve(base, '/etc/passwd') ignores `base` entirely and returns
+    // '/etc/passwd' -- a request path with a doubled slash produces exactly
+    // that absolute second argument once the /samples/ prefix is stripped.
+    const absoluteInjection = await rawHttpRequest(`http://127.0.0.1:${port}/samples//${path.join(secretDir, 'private.txt')}`);
+    assert.notStrictEqual(absoluteInjection.statusCode, 200);
+    assert.ok(!absoluteInjection.body.includes('should never be served'));
+
+    // Nonexistent sample file.
+    const missing = await rawHttpRequest(`http://127.0.0.1:${port}/samples/does-not-exist.mp4`);
+    assert.strictEqual(missing.statusCode, 404);
+  } finally {
+    await close(server);
+  }
+});
