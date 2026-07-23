@@ -30,7 +30,7 @@ function rawHttpRequest(url, { method = 'GET', headers = {}, body, timeoutMs = 3
     const req = http.request(url, { method, headers }, (res) => {
       const chunks = [];
       res.on('data', (chunk) => chunks.push(chunk));
-      res.on('end', () => resolve({ statusCode: res.statusCode, body: Buffer.concat(chunks).toString('utf8') }));
+      res.on('end', () => resolve({ statusCode: res.statusCode, headers: res.headers, body: Buffer.concat(chunks).toString('utf8') }));
     });
     // A regression of the hop-by-hop header bug hangs the upstream request
     // rather than erroring fast (matches production: nginx logged "upstream
@@ -240,6 +240,41 @@ test('/samples/* serves public assets with Range support and rejects path traver
     // Nonexistent sample file.
     const missing = await rawHttpRequest(`http://127.0.0.1:${port}/samples/does-not-exist.mp4`);
     assert.strictEqual(missing.statusCode, 404);
+  } finally {
+    await close(server);
+  }
+});
+
+// Regression test: the route matcher used to check `req.method === 'GET'`
+// only, so HEAD requests (issued by monitoring tools, curl -I, link
+// checkers, etc.) fell through to the SPA catch-all and got back
+// text/html instead of the asset's real content-type -- with no body, so
+// content-length was wrong too.
+test('/samples/* answers HEAD requests with real headers and no body', async () => {
+  const uiDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cast-ui-'));
+  const uploadDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cast-upload-'));
+  const publicSamplesDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cast-samples-'));
+
+  const content = Buffer.from('0123456789'.repeat(10)); // 100 bytes
+  fs.writeFileSync(path.join(publicSamplesDir, 'clip.mp4'), content);
+
+  const server = createServer({ rootDir: uiDir, uiDir, uploadDir, publicSamplesDir });
+  const port = await listen(server);
+
+  try {
+    const head = await rawHttpRequest(`http://127.0.0.1:${port}/samples/clip.mp4`, { method: 'HEAD' });
+    assert.strictEqual(head.statusCode, 200);
+    assert.strictEqual(head.headers['content-type'], 'video/mp4');
+    assert.strictEqual(head.headers['content-length'], String(content.length));
+    assert.strictEqual(head.body, '');
+
+    const rangedHead = await rawHttpRequest(`http://127.0.0.1:${port}/samples/clip.mp4`, {
+      method: 'HEAD',
+      headers: { range: 'bytes=10-19' },
+    });
+    assert.strictEqual(rangedHead.statusCode, 206);
+    assert.strictEqual(rangedHead.headers['content-range'], `bytes 10-19/${content.length}`);
+    assert.strictEqual(rangedHead.body, '');
   } finally {
     await close(server);
   }

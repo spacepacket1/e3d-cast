@@ -219,6 +219,7 @@ function serveSampleAsset(req, res, publicSamplesDir, requestPath) {
     res.end('not found');
     return;
   }
+  const isHead = req.method === 'HEAD';
   const stat = fs.statSync(resolved);
   const contentType = contentTypeFor(resolved);
   const range = req.headers ? req.headers.range : null;
@@ -227,6 +228,10 @@ function serveSampleAsset(req, res, publicSamplesDir, requestPath) {
     res.setHeader('content-type', contentType);
     res.setHeader('content-length', stat.size);
     res.setHeader('accept-ranges', 'bytes');
+    if (isHead) {
+      res.end();
+      return;
+    }
     fs.createReadStream(resolved).pipe(res);
     return;
   }
@@ -250,6 +255,10 @@ function serveSampleAsset(req, res, publicSamplesDir, requestPath) {
   res.setHeader('content-range', `bytes ${start}-${end}/${stat.size}`);
   res.setHeader('content-length', end - start + 1);
   res.setHeader('accept-ranges', 'bytes');
+  if (isHead) {
+    res.end();
+    return;
+  }
   fs.createReadStream(resolved, { start, end }).pipe(res);
 }
 
@@ -286,7 +295,10 @@ function createServer(config = {}) {
       if (req.method === 'POST' && requestUrl.pathname === '/ui-api/uploads') {
         return handleUpload(req, res, { uploadDir });
       }
-      if (req.method === 'GET' && requestUrl.pathname.startsWith('/samples/')) {
+      if (
+        (req.method === 'GET' || req.method === 'HEAD')
+        && requestUrl.pathname.startsWith('/samples/')
+      ) {
         return serveSampleAsset(req, res, publicSamplesDir, requestUrl.pathname);
       }
       if (
