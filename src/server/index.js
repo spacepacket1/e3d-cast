@@ -49,6 +49,10 @@ function contentTypeFor(filePath) {
       return 'video/mp4';
     case '.srt':
       return 'application/x-subrip';
+    case '.txt':
+      return 'text/plain; charset=utf-8';
+    case '.xml':
+      return 'application/xml; charset=utf-8';
     default:
       return 'application/octet-stream';
   }
