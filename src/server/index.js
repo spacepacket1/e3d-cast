@@ -308,6 +308,9 @@ function createServer(config = {}) {
       if (
         requestUrl.pathname === '/ui-api/payments/credits/quote'
         || requestUrl.pathname === '/ui-api/payments/credits/purchase'
+        || requestUrl.pathname === '/ui-api/payments/stripe/packs'
+        || requestUrl.pathname === '/ui-api/payments/stripe/checkout'
+        || requestUrl.pathname.startsWith('/ui-api/payments/stripe/session/')
       ) {
         return forwardServiceCall(req, res, targetBaseUrl, serviceToken);
       }

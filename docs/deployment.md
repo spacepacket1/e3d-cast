@@ -31,6 +31,25 @@ SPACEPACKET_SERVICE_BEARER_TOKEN=...
 
 The rest of the render/payment environment remains in `.env` or the PM2 environment as established by earlier phases.
 
+### Stripe card payments (Spacepacket)
+
+Card checkout is implemented on the Spacepacket API (not Cast UI). Set these on the **spacepacket** process:
+
+```bash
+STRIPE_SECRET_KEY=sk_live_...   # or sk_test_...
+STRIPE_WEBHOOK_SECRET=whsec_...
+# defaults already point at cast.e3d.ai:
+# STRIPE_SUCCESS_URL=https://cast.e3d.ai/?stripe_session_id={CHECKOUT_SESSION_ID}
+# STRIPE_CANCEL_URL=https://cast.e3d.ai/?stripe_cancelled=1
+```
+
+Webhook endpoint (Dashboard or CLI):
+
+`https://cast.e3d.ai/api/payments/stripe/webhook`  
+(event: `checkout.session.completed` — already covered by `location /api/payments/`)
+
+Details: `spacepacket/docs/cast-stripe-payments.md`
+
 ## Deploy steps
 
 1. Build the UI: `npm run build`

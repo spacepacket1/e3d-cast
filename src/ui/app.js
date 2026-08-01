@@ -132,6 +132,12 @@
     paymentMethod: document.querySelector('#payment-method'),
     registerPurchase: document.querySelector('#register-purchase'),
     refreshBalance: document.querySelector('#refresh-balance'),
+    stripePacks: document.querySelector('#stripe-packs'),
+    stripeStatus: document.querySelector('#stripe-status'),
+    buyCreditsCta: document.querySelector('#buy-credits-cta'),
+    heroCta: document.querySelector('#hero-cta'),
+    heroBuyStarter: document.querySelector('#hero-buy-starter'),
+    heroTryFree: document.querySelector('#hero-try-free'),
     jobsList: document.querySelector('#jobs-list'),
     loadWalletJobs: document.querySelector('#load-wallet-jobs'),
     jobDetail: document.querySelector('#job-detail'),
@@ -959,6 +965,144 @@ ${Object.keys(archive).length ? `\n${JSON.stringify(archive, null, 2)}` : '\nCon
     els.quotePanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
 
+  function setStripeStatus(html) {
+    if (!els.stripeStatus) return;
+    els.stripeStatus.innerHTML = html;
+  }
+
+  async function loadStripePacks() {
+    if (!els.stripePacks) return;
+    try {
+      const data = await apiJson('/ui-api/payments/stripe/packs');
+      if (!data.enabled) {
+        els.stripePacks.innerHTML = '<p class="small">Card payments are not configured on this server yet (missing Stripe keys).</p>';
+        return;
+      }
+      els.stripePacks.innerHTML = (data.packs || []).map((pack) => `
+        <button type="button" class="stripe-pack" data-pack-id="${pack.id}">
+          <strong>${pack.name}</strong>
+          <span class="pack-meta">${pack.credits.toLocaleString()} credits · ${pack.description || ''}</span>
+          <span class="pack-price">$${Number(pack.amountUsd).toFixed(pack.amountUsd % 1 ? 2 : 0)}</span>
+        </button>
+      `).join('');
+      els.stripePacks.querySelectorAll('[data-pack-id]').forEach((button) => {
+        button.addEventListener('click', () => startStripeCheckout(button.dataset.packId));
+      });
+    } catch (error) {
+      els.stripePacks.innerHTML = `<p class="small">Could not load card packs: ${(error.payload && error.payload.error) || error.message}</p>`;
+    }
+  }
+
+  function scrollToPayments() {
+    const panel = document.querySelector('.payment-controls');
+    if (panel) panel.scrollIntoView({ behavior: 'smooth', block: 'center' });
+  }
+
+  async function startStripeCheckout(packId) {
+    setStripeStatus('<span class="small">Opening Stripe Checkout…</span>');
+    scrollToPayments();
+    try {
+      const checkout = await apiJson('/ui-api/payments/stripe/checkout', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          product: 'cast',
+          packId,
+          wallet: state.wallet || undefined,
+        }),
+      });
+      if (!checkout.url) {
+        throw new Error('Stripe did not return a checkout URL');
+      }
+      window.location.href = checkout.url;
+    } catch (error) {
+      setStripeStatus(`<div class="manifest-box">${(error.payload && JSON.stringify(error.payload, null, 2)) || error.message}</div>`);
+      scrollToPayments();
+    }
+  }
+
+  function renderHeroCta() {
+    if (!els.heroCta) return;
+    const funded = Number(state.creditBalance) > 0 || !!state.creditKey;
+    els.heroCta.classList.toggle('is-funded', funded);
+    const title = els.heroCta.querySelector('h2');
+    const copy = els.heroCta.querySelector('.hero-cta-copy .small');
+    if (funded) {
+      const credits = state.creditBalance == null ? 'credits ready' : `${state.creditBalance} credits ready`;
+      if (title) title.textContent = 'You are funded — create a video';
+      if (copy) copy.textContent = `${credits}. Paste a transcript or upload audio, get a quote, then Create Video.`;
+    } else {
+      if (title) title.textContent = 'Your first videos for $19';
+      if (copy) {
+        copy.textContent = 'Starter pack = 2,000 credits (~4 YouTube-length renders). Card checkout via Stripe. Free sample render available with no purchase.';
+      }
+    }
+    if (els.buyCreditsCta) {
+      els.buyCreditsCta.hidden = funded;
+    }
+  }
+
+  async function claimStripeSessionIfPresent() {
+    const params = new URLSearchParams(window.location.search);
+    const sessionId = params.get('stripe_session_id');
+    const cancelled = params.get('stripe_cancelled');
+    if (cancelled) {
+      setStripeStatus('<span class="small">Card checkout cancelled. No charge was made.</span>');
+      // Clean the query string without a full reload.
+      window.history.replaceState({}, '', window.location.pathname);
+      return;
+    }
+    if (!sessionId) return;
+
+    setStripeStatus('<span class="small">Confirming card payment and unlocking credits…</span>');
+    try {
+      // Poll briefly — webhook may land a second after redirect.
+      let result = null;
+      let lastError = null;
+      for (let attempt = 1; attempt <= 8; attempt += 1) {
+        try {
+          const response = await fetch(`/ui-api/payments/stripe/session/${encodeURIComponent(sessionId)}/result`, {
+            method: 'GET',
+            headers: { accept: 'application/json' },
+          });
+          const payload = await response.json().catch(() => ({}));
+          if (response.status === 202) {
+            setStripeStatus(`<span class="small">Payment received — waiting for credit grant (attempt ${attempt}/8)…</span>`);
+            await new Promise((resolve) => setTimeout(resolve, 1500));
+            continue;
+          }
+          if (!response.ok) {
+            lastError = payload;
+            // KEY_ALREADY_CLAIMED: user refreshed after success; keep existing key if any.
+            if (response.status === 409 && payload.code === 'KEY_ALREADY_CLAIMED') {
+              setStripeStatus(`<span class="small">This payment already unlocked ${payload.issuedCredits || ''} credits. If Create Video is locked, use the credit key from your first successful return, or buy a new pack.</span>`);
+              window.history.replaceState({}, '', window.location.pathname);
+              return;
+            }
+            throw Object.assign(new Error(payload.error || `HTTP ${response.status}`), { payload });
+          }
+          result = payload;
+          break;
+        } catch (err) {
+          lastError = err;
+          await new Promise((resolve) => setTimeout(resolve, 1500));
+        }
+      }
+      if (!result || !result.creditKey) {
+        throw Object.assign(new Error('Could not claim credit key from Stripe session'), { payload: lastError });
+      }
+      state.creditKey = result.creditKey;
+      persistState();
+      await refreshBalance();
+      setStripeStatus(`<span class="small">Card payment confirmed — ${result.issuedCredits} credits added. You’re ready to Create Video.</span>`);
+      window.history.replaceState({}, '', window.location.pathname);
+      render();
+    } catch (error) {
+      setStripeStatus(`<div class="manifest-box">${(error.payload && JSON.stringify(error.payload, null, 2)) || error.message}</div>`);
+      window.history.replaceState({}, '', window.location.pathname);
+    }
+  }
+
   async function quotePurchase() {
     if (!state.wallet) {
       state.wallet = window.prompt('Enter a wallet address') || '';
@@ -1421,6 +1565,22 @@ ${Object.keys(archive).length ? `\n${JSON.stringify(archive, null, 2)}` : '\nCon
       });
     });
     els.connectWallet.addEventListener('click', connectWallet);
+    if (els.buyCreditsCta) {
+      els.buyCreditsCta.addEventListener('click', () => startStripeCheckout('starter'));
+    }
+    if (els.heroBuyStarter) {
+      els.heroBuyStarter.addEventListener('click', () => startStripeCheckout('starter'));
+    }
+    if (els.heroTryFree) {
+      els.heroTryFree.addEventListener('click', () => {
+        state.mode = 'sample';
+        persistState();
+        render();
+        const samplePanel = document.querySelector('#input-mode-panel');
+        if (samplePanel) samplePanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
+        createLocalSampleJob();
+      });
+    }
     els.loadWalletJobs.addEventListener('click', async () => {
       const original = els.loadWalletJobs.textContent;
       els.loadWalletJobs.disabled = true;
@@ -1471,6 +1631,9 @@ ${Object.keys(archive).length ? `\n${JSON.stringify(archive, null, 2)}` : '\nCon
       }
     }
 
+    await loadStripePacks();
+    // Handle return from Stripe Checkout before first paint of payment panel status.
+    await claimStripeSessionIfPresent();
     render();
   }
 
@@ -1481,6 +1644,7 @@ ${Object.keys(archive).length ? `\n${JSON.stringify(archive, null, 2)}` : '\nCon
     renderPresetGrid();
     renderStyleGrid();
     renderStatus();
+    renderHeroCta();
     renderPlatformMetadataInputs();
     renderBrandKitCopy();
     renderQuotePanel();

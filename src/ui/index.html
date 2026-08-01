@@ -18,7 +18,7 @@
     <meta name="twitter:image" content="https://cast.e3d.ai/samples/audio-youtube/thumbnail.png">
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <link rel="icon" type="image/png" sizes="32x32" href="/e3d_logo_32.png">
-    <link rel="stylesheet" href="/styles.css?v=7">
+    <link rel="stylesheet" href="/styles.css?v=9">
   </head>
   <body>
     <div class="page-shell">
@@ -34,12 +34,26 @@
             </div>
           </div>
           <div class="topbar-actions">
+            <button id="buy-credits-cta" class="button primary" type="button">Buy credits — $19</button>
             <button id="connect-wallet" class="button secondary">Connect Wallet</button>
             <a id="get-e3d-link" class="button ghost" target="_blank" rel="noreferrer">Get E3D</a>
           </div>
         </div>
-        <p class="subhead">Cast turns text or audio into video through a single API call, priced and paid per job in E3D micropayments — built for agents, open to anyone.</p>
+        <p class="subhead">Turn podcast audio or a transcript into a finished video. Pay with a card — no wallet required. Agents can still pay in E3D.</p>
       </header>
+
+      <section id="hero-cta" class="hero-cta">
+        <div class="hero-cta-copy">
+          <p class="eyebrow">Start here</p>
+          <h2>Your first videos for $19</h2>
+          <p class="small">Starter pack = 2,000 credits (~4 YouTube-length renders). Card checkout via Stripe. Free sample render available with no purchase.</p>
+        </div>
+        <div class="hero-cta-actions">
+          <button id="hero-buy-starter" class="button primary" type="button">Buy Starter — $19</button>
+          <button id="hero-try-free" class="button secondary" type="button">Try free sample</button>
+          <a class="button ghost" href="/pricing.html">See all packs</a>
+        </div>
+      </section>
 
       <section class="status-grid">
         <article id="wallet-card" class="status-card">
@@ -141,15 +155,23 @@
               <button id="payments-info" class="info-btn" title="About payment methods" aria-label="Payment method info">ℹ</button>
             </div>
             <div class="payment-controls">
-              <input id="credit-request" class="text-input" type="number" min="100" step="100" value="1000">
-              <button id="quote-purchase" class="button secondary">Quote credit purchase</button>
-              <div id="purchase-quote" class="info-stack"></div>
-              <input id="tx-hash" class="text-input mono" type="text" placeholder="0x transaction hash">
-              <select id="payment-method" class="text-input">
-                <option value="base-we3d">Base wE3D</option>
-                <option value="ethereum-e3d">Ethereum E3D</option>
-              </select>
-              <button id="register-purchase" class="button secondary">Register purchase</button>
+              <p class="section-title">Pay with card</p>
+              <p class="small">Buy credits with Stripe — no wallet required. Credits unlock Create Video immediately after checkout.</p>
+              <div id="stripe-packs" class="stripe-packs"></div>
+              <div id="stripe-status" class="info-stack"></div>
+
+              <details class="crypto-payments">
+                <summary>Pay with E3D / wE3D (advanced)</summary>
+                <input id="credit-request" class="text-input" type="number" min="100" step="100" value="1000">
+                <button id="quote-purchase" class="button secondary">Quote credit purchase</button>
+                <div id="purchase-quote" class="info-stack"></div>
+                <input id="tx-hash" class="text-input mono" type="text" placeholder="0x transaction hash">
+                <select id="payment-method" class="text-input">
+                  <option value="base-we3d">Base wE3D</option>
+                  <option value="ethereum-e3d">Ethereum E3D</option>
+                </select>
+                <button id="register-purchase" class="button secondary">Register purchase</button>
+              </details>
               <button id="refresh-balance" class="button ghost">Refresh balance</button>
             </div>
           </section>
@@ -186,14 +208,15 @@
     <dialog id="payments-info-dialog">
       <div class="dialog-body">
         <button id="dialog-close" class="dialog-close" aria-label="Close">✕</button>
-        <h3>Ethereum E3D vs Base wE3D</h3>
-        <p><strong>Ethereum E3D</strong> (ticker: E3D) is the native token on Ethereum mainnet. Send E3D directly from your Ethereum wallet to purchase Cast credits in one transaction.</p>
-        <p><strong>Base wE3D</strong> is wrapped E3D bridged to Base. It settles faster and costs less gas, making it the preferred option for agent automation and frequent API payments.</p>
-        <p>Both tokens share the same credit rate: <strong>1 E3D = 1,000 credits</strong>. Credits are non-custodial — they are spent per job at submission time.</p>
+        <h3>How to pay for Cast credits</h3>
+        <p><strong>Card (recommended)</strong> — Stripe Checkout packs on the workspace. No wallet required. After payment you return here with a credit key ready to render.</p>
+        <p><strong>Ethereum E3D</strong> — native token on Ethereum mainnet. Send E3D to the treasury and register the transaction hash.</p>
+        <p><strong>Base wE3D</strong> — wrapped E3D on Base. Faster / cheaper gas for agents and frequent top-ups.</p>
+        <p>On-chain rate: <strong>1 E3D = 1,000 credits</strong>. Credits are spent per job at submission time.</p>
         <a href="/docs.html#wallet-credits" target="_blank" rel="noreferrer" class="button primary">Full payment docs ↗</a>
       </div>
     </dialog>
 
-    <script src="/app.js?v=7"></script>
+    <script src="/app.js?v=9"></script>
   </body>
 </html>
