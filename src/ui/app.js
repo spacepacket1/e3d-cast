@@ -159,6 +159,7 @@
       wallet: '',
       creditKey: '',
       creditBalance: null,
+      creditBalanceError: false,
       holderDiscountApplied: false,
       mode: 'transcript',
       preset: 'transcript_short',
@@ -716,7 +717,9 @@
     els.connectWallet.textContent = connected ? `${state.wallet.slice(0, 6)}…` : 'Connect Wallet';
     els.connectWallet.className = connected ? 'button primary' : 'button secondary';
     els.holderBadge.textContent = state.holderDiscountApplied ? '20% holder discount active' : 'Holder discount pending wallet quote';
-    els.creditBalance.textContent = state.creditBalance == null ? 'No credit key' : `${state.creditBalance} credits`;
+    els.creditBalance.textContent = state.creditBalanceError
+      ? 'Balance unavailable — tap Refresh'
+      : (state.creditBalance == null ? 'No credit key' : `${state.creditBalance} credits`);
     els.creditKeyLabel.textContent = state.creditKey ? `Key ${state.creditKey.slice(0, 14)}...` : 'Add credits to unlock paid submission';
     els.activeTier.textContent = currentTier();
     els.freeAttempts.textContent = `Free sample attempts remaining: ${attemptsRemaining}`;
@@ -1158,10 +1161,19 @@ ${Object.keys(archive).length ? `\n${JSON.stringify(archive, null, 2)}` : '\nCon
 
   async function refreshBalance() {
     if (!state.creditKey) return;
-    const balance = await apiJson('/api/payments/credits/balance?product=cast', {
-      headers: { authorization: `Bearer ${state.creditKey}` },
-    });
-    state.creditBalance = balance.credits;
+    try {
+      const balance = await apiJson('/api/payments/credits/balance?product=cast', {
+        headers: { authorization: `Bearer ${state.creditKey}` },
+      });
+      state.creditBalance = balance.credits;
+      state.creditBalanceError = false;
+    } catch (error) {
+      // Previously swallowed with no console log and no UI signal, so a
+      // real purchase (credit key correctly saved) looked identical to "no
+      // credit key" -- indistinguishable from having never paid at all.
+      console.error('refreshBalance failed', error);
+      state.creditBalanceError = true;
+    }
     persistState();
     renderStatus();
   }
@@ -1613,11 +1625,7 @@ ${Object.keys(archive).length ? `\n${JSON.stringify(archive, null, 2)}` : '\nCon
     els.archiveToggle.addEventListener('change', (event) => { state.archiveToIpfs = event.target.checked; persistState(); });
 
     if (state.creditKey) {
-      try {
-        await refreshBalance();
-      } catch (_error) {
-        state.creditBalance = null;
-      }
+      await refreshBalance();
     }
     if (state.wallet) fetchTokenBalances();
     if (state.selectedJobId) {
