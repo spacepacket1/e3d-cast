@@ -1012,6 +1012,10 @@ ${Object.keys(archive).length ? `\n${JSON.stringify(archive, null, 2)}` : '\nCon
           product: 'cast',
           packId,
           wallet: state.wallet || undefined,
+          // Lets a repeat purchase top up this same key's balance instead of
+          // minting an unrelated second key the UI would then overwrite this
+          // one with, silently orphaning whatever was on it.
+          existingCreditKey: state.creditKey || undefined,
         }),
       });
       if (!checkout.url) {
@@ -1091,13 +1095,17 @@ ${Object.keys(archive).length ? `\n${JSON.stringify(archive, null, 2)}` : '\nCon
           await new Promise((resolve) => setTimeout(resolve, 1500));
         }
       }
-      if (!result || !result.creditKey) {
+      if (!result || (!result.creditKey && !result.merged)) {
         throw Object.assign(new Error('Could not claim credit key from Stripe session'), { payload: lastError });
       }
-      state.creditKey = result.creditKey;
-      persistState();
+      // A merge tops up the credit key already in state.creditKey (that's
+      // what made the merge possible) rather than issuing a new one.
+      if (result.creditKey) {
+        state.creditKey = result.creditKey;
+        persistState();
+      }
       await refreshBalance();
-      setStripeStatus(`<span class="small">Card payment confirmed — ${result.issuedCredits} credits added. You’re ready to Create Video.</span>`);
+      setStripeStatus(`<span class="small">Card payment confirmed — ${result.issuedCredits} credits added${result.merged ? ' to your existing balance' : ''}. You’re ready to Create Video.</span>`);
       window.history.replaceState({}, '', window.location.pathname);
       render();
     } catch (error) {
