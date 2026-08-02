@@ -4,35 +4,37 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Cast API &amp; Agent Docs</title>
-    <meta name="description" content="Full curl reference, CLI usage, and agent integration guide for building on the Cast video-rendering API, paid per job in E3D.">
+    <meta name="description" content="Full curl reference, CLI usage, and agent integration guide for building on the Cast video-rendering API. Agents pay in E3D; browser users can pay by card from $9.">
     <link rel="canonical" href="https://cast.e3d.ai/agent.html">
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="Cast">
     <meta property="og:title" content="Cast API &amp; Agent Docs">
-    <meta property="og:description" content="Full curl reference, CLI usage, and agent integration guide for building on the Cast video-rendering API, paid per job in E3D.">
+    <meta property="og:description" content="Full curl reference, CLI usage, and agent integration guide for building on the Cast video-rendering API. Agents pay in E3D; browser users can pay by card from $9.">
     <meta property="og:url" content="https://cast.e3d.ai/agent.html">
     <meta property="og:image" content="https://cast.e3d.ai/samples/audio-youtube/thumbnail.png">
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="Cast API &amp; Agent Docs">
-    <meta name="twitter:description" content="Full curl reference, CLI usage, and agent integration guide for building on the Cast video-rendering API, paid per job in E3D.">
+    <meta name="twitter:description" content="Full curl reference, CLI usage, and agent integration guide for building on the Cast video-rendering API. Agents pay in E3D; browser users can pay by card from $9.">
     <meta name="twitter:image" content="https://cast.e3d.ai/samples/audio-youtube/thumbnail.png">
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <link rel="icon" type="image/png" sizes="32x32" href="/e3d_logo_32.png">
     <link rel="stylesheet" href="/styles.css?v=7">
     <style>
-      .agent-page { max-width: 860px; margin: 0 auto; padding: 40px 24px; }
-      .back-link { display: inline-block; margin-bottom: 28px; color: var(--muted); text-decoration: none; font-size: 0.9rem; }
-      .back-link:hover { color: var(--ink); }
-      .section-divider { border: none; border-top: 1px solid var(--line); margin: 32px 0; }
       .endpoint-label { font-size: 0.78rem; letter-spacing: 0.1em; text-transform: uppercase; color: var(--muted); margin: 0 0 8px; font-weight: 700; }
       .method-badge { display: inline-block; padding: 2px 8px; border-radius: 6px; font-size: 0.76rem; font-weight: 700; margin-right: 6px; vertical-align: middle; }
       .method-get { background: rgba(31,122,76,0.12); color: var(--success); }
       .method-post { background: rgba(191,74,43,0.12); color: var(--accent); }
+      /* Technical reference, not the editorial consumer pages -- a smaller,
+         monospace-led header signals the register shift instead of reusing
+         the same oversized serif h1 that sits above marketing copy elsewhere. */
+      .agent-page h1 { font-family: var(--mono); font-size: 1.7rem; font-weight: 700; display: flex; align-items: center; gap: 10px; }
+      .agent-page h1 .title-logo { width: 28px; height: 28px; }
     </style>
   </head>
   <body>
     <div class="agent-page">
       <a href="/" class="back-link">← Back to Cast</a>
+      <p class="eyebrow">Technical reference</p>
       <h1><img src="/e3d_logo_200.png" alt="E3D" class="title-logo">Cast API <span class="powered-by">(powered by E3D)</span></h1>
       <p class="subhead">Full curl reference, CLI usage, and agent integration guide for <strong>cast.e3d.ai</strong>.</p>
 
@@ -135,6 +137,18 @@
 
       <div id="live-capabilities" class="panel" style="margin-top:0"></div>
     </div>
+
+    <footer class="site-footer">
+      <div class="site-footer-inner">
+        <span>© 2026 E3D Cast</span>
+        <nav class="footer-links">
+          <a href="/terms.html">Terms</a>
+          <a href="/privacy.html">Privacy</a>
+          <a href="/refund.html">Refunds</a>
+          <a href="mailto:support@e3d.ai">support@e3d.ai</a>
+        </nav>
+      </div>
+    </footer>
 
     <script>
       (function () {

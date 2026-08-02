@@ -4,26 +4,22 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Cast Docs</title>
-    <meta name="description" content="How Cast's workspace, presets, caption styles, and wallet-paid credits work, end to end.">
+    <meta name="description" content="How Cast's workspace, presets, caption styles, and payments (card or wallet) work, end to end.">
     <link rel="canonical" href="https://cast.e3d.ai/docs.html">
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="Cast">
     <meta property="og:title" content="Cast Docs">
-    <meta property="og:description" content="How Cast's workspace, presets, caption styles, and wallet-paid credits work, end to end.">
+    <meta property="og:description" content="How Cast's workspace, presets, caption styles, and payments (card or wallet) work, end to end.">
     <meta property="og:url" content="https://cast.e3d.ai/docs.html">
     <meta property="og:image" content="https://cast.e3d.ai/samples/audio-youtube/thumbnail.png">
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="Cast Docs">
-    <meta name="twitter:description" content="How Cast's workspace, presets, caption styles, and wallet-paid credits work, end to end.">
+    <meta name="twitter:description" content="How Cast's workspace, presets, caption styles, and payments (card or wallet) work, end to end.">
     <meta name="twitter:image" content="https://cast.e3d.ai/samples/audio-youtube/thumbnail.png">
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <link rel="icon" type="image/png" sizes="32x32" href="/e3d_logo_32.png">
     <link rel="stylesheet" href="/styles.css?v=7">
     <style>
-      .agent-page { max-width: 860px; margin: 0 auto; padding: 40px 24px; }
-      .back-link { display: inline-block; margin-bottom: 28px; color: var(--muted); text-decoration: none; font-size: 0.9rem; }
-      .back-link:hover { color: var(--ink); }
-      .section-divider { border: none; border-top: 1px solid var(--line); margin: 32px 0; }
       .docs-table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 0.92rem; }
       .docs-table th, .docs-table td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); vertical-align: top; }
       .docs-table th { color: var(--muted); font-size: 0.78rem; letter-spacing: 0.06em; text-transform: uppercase; }
@@ -88,7 +84,7 @@
           <tr><td><strong>Upload</strong></td><td>Choose a local audio/video file. It's registered with the upload helper and uploaded before you can quote or submit — wait for the progress bar to finish.</td></tr>
           <tr><td><strong>Source URL</strong></td><td>Paste a public media URL. Cast fetches it on the server side rather than requiring you to download and re-upload it yourself.</td></tr>
           <tr><td><strong>Transcript</strong></td><td>Paste text directly — no audio file needed. Cast synthesizes narration for the full transcript, so cost scales with how much text you paste (see the <a href="/pricing.html">pricing page</a> for the surcharge). This is the default tab.</td></tr>
-          <tr><td><strong>Sample</strong></td><td>Pick one of three public sample recordings to try the pipeline without providing your own input. Pairs with the <a href="#free">Try free render</a> button below.</td></tr>
+          <tr><td><strong>Sample</strong></td><td>Pick one of three public sample recordings to try the pipeline without providing your own input. Pairs with the <a href="#free">Try free sample</a> button below.</td></tr>
         </tbody>
       </table>
       <p class="small">Switching between Upload/Source URL (audio-driven) and Transcript/Sample (text-driven) automatically swaps the output preset to its equivalent, so you don't end up with a mismatched preset/input combination.</p>
@@ -140,7 +136,7 @@
             <td><strong>Create Video</strong></td>
             <td>Submits the job for real. If you're not connected, it connects your wallet first; if you don't have enough credits, it quotes a credit purchase, has you confirm and send the payment from your wallet, registers the purchase once it confirms on-chain, and then submits — all from one click. If you already have enough credits, it just submits.</td>
           </tr>
-          <tr><td><strong>Try free render</strong></td><td>Runs a local, no-wallet-needed demo using one of the three public sample recordings instead of calling the paid API. See <a href="#free">Free sample attempts</a>.</td></tr>
+          <tr><td><strong>Try free sample</strong></td><td>Runs a local, no-wallet-needed demo using one of the three public sample recordings instead of calling the paid API. See <a href="#free">Free sample attempts</a>.</td></tr>
         </tbody>
       </table>
       <p class="small">The Spend preview panel next to the form always reflects your most recent quote — expected render time, estimated artifact size, discount status, and retention window.</p>
@@ -157,7 +153,7 @@
         <li><strong>Register purchase</strong> — paste the transaction hash and pick the payment method used, so Cast can verify it on-chain and issue a credit key.</li>
         <li><strong>Refresh balance</strong> — re-checks your current credit balance at any time.</li>
       </ol>
-      <p class="small"><strong>Ethereum E3D</strong> is the native token on Ethereum mainnet. <strong>Base wE3D</strong> is wrapped E3D bridged to Base — faster and cheaper to send, preferred for agent automation. Both settle credits at the same rate. Full breakdown in the <em>ℹ</em> icon next to Payments, or the <a href="/pricing.html">pricing page</a>.</p>
+      <p class="small"><strong>Base wE3D</strong> is wrapped E3D bridged to Base — faster and cheaper to send, preferred for agent automation. <strong>Ethereum E3D</strong> is the native token on Ethereum mainnet. Both settle credits at the same rate. Full breakdown in the <em>ℹ</em> icon next to Payments, or the <a href="/pricing.html">pricing page</a>.</p>
 
       <hr class="section-divider">
 
@@ -176,11 +172,23 @@
       <hr class="section-divider">
 
       <h2 id="free">11. Free sample attempts</h2>
-      <p>The Tier status card shows <strong>free sample attempts remaining</strong> — up to 3. Each counts down when you click <strong>Try free render</strong> on the Sample input tab. These are local, no-wallet, no-cost demo renders built from Cast's own public sample recordings, meant to show what a finished render looks like before you spend anything real. Once the free samples don't tell you what you need, quote a real job with your own input.</p>
+      <p>The Tier status card shows <strong>free sample attempts remaining</strong> — up to 3. Each counts down when you click <strong>Try free sample</strong> on the Sample input tab. These are local, no-wallet, no-cost demo renders built from Cast's own public sample recordings, meant to show what a finished render looks like before you spend anything real. Once the free samples don't tell you what you need, quote a real job with your own input.</p>
 
       <hr class="section-divider">
 
       <p class="small">Building against the API instead of the UI? See the <a href="/agent.html">API docs</a>. For exact costs and tier limits, see <a href="/pricing.html">pricing</a>. For example output, see the <a href="/gallery.html">gallery</a>.</p>
     </div>
+
+    <footer class="site-footer">
+      <div class="site-footer-inner">
+        <span>© 2026 E3D Cast</span>
+        <nav class="footer-links">
+          <a href="/terms.html">Terms</a>
+          <a href="/privacy.html">Privacy</a>
+          <a href="/refund.html">Refunds</a>
+          <a href="mailto:support@e3d.ai">support@e3d.ai</a>
+        </nav>
+      </div>
+    </footer>
   </body>
 </html>

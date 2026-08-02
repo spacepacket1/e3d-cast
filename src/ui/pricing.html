@@ -4,31 +4,28 @@
     <meta charset="utf-8">
     <meta name="viewport" content="width=device-width, initial-scale=1">
     <title>Cast Pricing</title>
-    <meta name="description" content="Cast tiers, credit rates, and E3D holder discounts for wallet-paid video rendering.">
+    <meta name="description" content="Cast pricing: card packs from $9, plus wallet-paid E3D rates and holder discounts for agents.">
     <link rel="canonical" href="https://cast.e3d.ai/pricing.html">
     <meta property="og:type" content="website">
     <meta property="og:site_name" content="Cast">
     <meta property="og:title" content="Cast Pricing">
-    <meta property="og:description" content="Cast tiers, credit rates, and E3D holder discounts for wallet-paid video rendering.">
+    <meta property="og:description" content="Cast pricing: card packs from $9, plus wallet-paid E3D rates and holder discounts for agents.">
     <meta property="og:url" content="https://cast.e3d.ai/pricing.html">
     <meta property="og:image" content="https://cast.e3d.ai/samples/audio-youtube/thumbnail.png">
     <meta name="twitter:card" content="summary_large_image">
     <meta name="twitter:title" content="Cast Pricing">
-    <meta name="twitter:description" content="Cast tiers, credit rates, and E3D holder discounts for wallet-paid video rendering.">
+    <meta name="twitter:description" content="Cast pricing: card packs from $9, plus wallet-paid E3D rates and holder discounts for agents.">
     <meta name="twitter:image" content="https://cast.e3d.ai/samples/audio-youtube/thumbnail.png">
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <link rel="icon" type="image/png" sizes="32x32" href="/e3d_logo_32.png">
     <link rel="stylesheet" href="/styles.css?v=7">
     <style>
-      .agent-page { max-width: 860px; margin: 0 auto; padding: 40px 24px; }
-      .back-link { display: inline-block; margin-bottom: 28px; color: var(--muted); text-decoration: none; font-size: 0.9rem; }
-      .back-link:hover { color: var(--ink); }
-      .section-divider { border: none; border-top: 1px solid var(--line); margin: 32px 0; }
       .pricing-table { width: 100%; border-collapse: collapse; margin: 16px 0; font-size: 0.92rem; }
       .pricing-table th, .pricing-table td { text-align: left; padding: 10px 12px; border-bottom: 1px solid var(--line); }
       .pricing-table th { color: var(--muted); font-size: 0.78rem; letter-spacing: 0.06em; text-transform: uppercase; }
       .pricing-table td.num { font-family: var(--mono); }
       .tier-free { color: var(--warning); font-weight: 700; }
+      .pack-buy-btn { padding: 8px 14px; font-size: 0.85rem; white-space: nowrap; }
     </style>
   </head>
   <body>
@@ -47,14 +44,15 @@
       <h3>Card packs (USD)</h3>
       <table class="pricing-table">
         <thead>
-          <tr><th>Pack</th><th>Credits</th><th>Price</th><th>Roughly covers</th></tr>
+          <tr><th>Pack</th><th>Credits</th><th>Price</th><th>Roughly covers</th><th></th></tr>
         </thead>
         <tbody>
-          <tr><td>Starter</td><td class="num">2,000</td><td class="num">$9</td><td>~4 YouTube renders</td></tr>
-          <tr><td>Creator</td><td class="num">10,000</td><td class="num">$29</td><td>~20 YouTube renders</td></tr>
-          <tr><td>Pro</td><td class="num">50,000</td><td class="num">$79</td><td>~100 YouTube renders</td></tr>
+          <tr><td>Starter</td><td class="num">2,000</td><td class="num">$9</td><td>~4 YouTube renders</td><td><button type="button" class="button primary pack-buy-btn" data-pack-id="starter">Buy — $9</button></td></tr>
+          <tr><td>Creator</td><td class="num">10,000</td><td class="num">$29</td><td>~20 YouTube renders</td><td><button type="button" class="button primary pack-buy-btn" data-pack-id="creator">Buy — $29</button></td></tr>
+          <tr><td>Pro</td><td class="num">50,000</td><td class="num">$79</td><td>~100 YouTube renders</td><td><button type="button" class="button primary pack-buy-btn" data-pack-id="pro">Buy — $79</button></td></tr>
         </tbody>
       </table>
+      <p id="pack-buy-status" class="small"></p>
 
       <hr class="section-divider">
 
@@ -95,6 +93,18 @@
       <p class="small">Get exact numbers for your own job before you spend anything: quote it first with <a href="/agent.html">the API</a> (<code>POST /api/cast/jobs/quote</code> — free, no credits spent) or from the <a href="/">Cast workspace</a>.</p>
     </div>
 
+    <footer class="site-footer">
+      <div class="site-footer-inner">
+        <span>© 2026 E3D Cast</span>
+        <nav class="footer-links">
+          <a href="/terms.html">Terms</a>
+          <a href="/privacy.html">Privacy</a>
+          <a href="/refund.html">Refunds</a>
+          <a href="mailto:support@e3d.ai">support@e3d.ai</a>
+        </nav>
+      </div>
+    </footer>
+
     <script>
       (function () {
         function formatBytes(bytes) {
@@ -133,8 +143,51 @@
             `;
           })
           .catch(() => {
-            document.querySelector('#tiers-table').innerHTML = '<p class="small">Live tier data is unavailable right now — see the <a href="/agent.html">API docs</a> for GET /api/cast/capabilities.</p>';
+            document.querySelector('#tiers-table').innerHTML = '<p class="small">Tier details are temporarily unavailable. Please refresh or try again shortly.</p>';
           });
+
+        // Same localStorage key the workspace (index.html) uses -- shared
+        // across pages on this origin, so a repeat purchase from here still
+        // merges into an existing balance instead of orphaning it.
+        function readExistingCreditKey() {
+          try {
+            const state = JSON.parse(localStorage.getItem('cast-ui-state-v1') || '{}');
+            return state.creditKey || '';
+          } catch (_err) {
+            return '';
+          }
+        }
+
+        document.querySelectorAll('.pack-buy-btn').forEach((button) => {
+          button.addEventListener('click', async () => {
+            const packId = button.dataset.packId;
+            const statusEl = document.querySelector('#pack-buy-status');
+            const original = button.textContent;
+            button.disabled = true;
+            button.textContent = 'Opening Stripe Checkout…';
+            if (statusEl) statusEl.textContent = '';
+            try {
+              const response = await fetch('/api/payments/stripe/checkout', {
+                method: 'POST',
+                headers: { 'content-type': 'application/json' },
+                body: JSON.stringify({
+                  product: 'cast',
+                  packId,
+                  existingCreditKey: readExistingCreditKey() || undefined,
+                }),
+              });
+              const data = await response.json().catch(() => ({}));
+              if (!response.ok || !data.url) {
+                throw new Error(data.error || `Could not start checkout (HTTP ${response.status})`);
+              }
+              window.location.href = data.url;
+            } catch (error) {
+              button.disabled = false;
+              button.textContent = original;
+              if (statusEl) statusEl.textContent = error.message || 'Could not start checkout.';
+            }
+          });
+        });
       }());
     </script>
   </body>

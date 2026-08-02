@@ -716,6 +716,9 @@
     els.walletDisplay.innerHTML = `<span id="wallet-dot" class="wallet-dot ${connected ? 'connected' : 'disconnected'}"></span>${shortWallet(state.wallet)}`;
     els.connectWallet.textContent = connected ? `${state.wallet.slice(0, 6)}…` : 'Connect Wallet';
     els.connectWallet.className = connected ? 'button primary' : 'button secondary';
+    // Holder-discount status is meaningless noise before a wallet is even
+    // connected -- only card-relevant info belongs in the default view.
+    els.holderBadge.hidden = !connected;
     els.holderBadge.textContent = state.holderDiscountApplied ? '20% holder discount active' : 'Holder discount pending wallet quote';
     els.creditBalance.textContent = state.creditBalanceError
       ? 'Balance unavailable — tap Refresh'
@@ -737,12 +740,15 @@
       return;
     }
     const freeTier = state.capabilities.tiers.find((tier) => tier.id === 'free');
+    // Burn amount / Get E3D are on-chain-payment concepts with no place in a
+    // card-first quote -- only show them once a wallet is actually in play.
+    const walletConnected = !!state.wallet;
     els.quotePanel.innerHTML = `
       <div class="info-stack">
         <strong>${state.quote.estimatedCredits} credits</strong>
         <span>Expected render time: ${state.quote.estimatedDurationSeconds}s</span>
         <span>Estimated artifact size: ${formatBytes(state.quote.estimatedArtifactBytes)}</span>
-        <span>Burn amount: ${state.quote.burnAmount} credits equivalent</span>
+        ${walletConnected ? `<span>Burn amount: ${state.quote.burnAmount} credits equivalent</span>` : ''}
         <span>Discount applied: ${state.quote.holderDiscountApplied ? 'yes' : 'no'}</span>
         <span>Retention: ${state.quote.limits.retentionHours}h</span>
         <span>Free tier reference: ${freeTier.freeAttempts} attempts, ${freeTier.maxTranscriptChars} chars max</span>
@@ -750,7 +756,7 @@
       <div class="chip-row">
         <span class="chip">Tier limit fit: ${state.quote.limits.maxTranscriptChars} chars</span>
         <span class="chip">Artifact cap: ${formatBytes(state.quote.limits.maxArtifactBytes)}</span>
-        <span class="chip">Get E3D: ${state.quote.pricing.getE3DUrl}</span>
+        ${walletConnected ? `<span class="chip">Get E3D: ${state.quote.pricing.getE3DUrl}</span>` : ''}
       </div>
     `;
   }
@@ -973,8 +979,24 @@ ${Object.keys(archive).length ? `\n${JSON.stringify(archive, null, 2)}` : '\nCon
     els.stripeStatus.innerHTML = html;
   }
 
+  // Known pack shape shown immediately so the payments panel never renders
+  // an empty gap while /payments/stripe/packs is still in flight -- actual
+  // prices/credits always come from the live response once it resolves.
+  const STRIPE_PACK_SKELETON = [
+    { id: 'starter', name: 'Starter', amountUsd: 9 },
+    { id: 'creator', name: 'Creator', amountUsd: 29 },
+    { id: 'pro', name: 'Pro', amountUsd: 79 },
+  ];
+
   async function loadStripePacks() {
     if (!els.stripePacks) return;
+    els.stripePacks.innerHTML = STRIPE_PACK_SKELETON.map((pack) => `
+      <button type="button" class="stripe-pack is-loading" disabled>
+        <strong>${pack.name}</strong>
+        <span class="pack-meta">Loading…</span>
+        <span class="pack-price">$${pack.amountUsd}</span>
+      </button>
+    `).join('');
     try {
       const data = await apiJson('/ui-api/payments/stripe/packs');
       if (!data.enabled) {
@@ -1082,7 +1104,7 @@ ${Object.keys(archive).length ? `\n${JSON.stringify(archive, null, 2)}` : '\nCon
             lastError = payload;
             // KEY_ALREADY_CLAIMED: user refreshed after success; keep existing key if any.
             if (response.status === 409 && payload.code === 'KEY_ALREADY_CLAIMED') {
-              setStripeStatus(`<span class="small">This payment already unlocked ${payload.issuedCredits || ''} credits. If Create Video is locked, use the credit key from your first successful return, or buy a new pack.</span>`);
+              setStripeStatus(`<span class="small">This payment already unlocked ${payload.issuedCredits || ''} credits. If Create Video is locked, use the credit key from your first successful return, or buy a new pack. Stuck? <a href="mailto:support@e3d.ai">support@e3d.ai</a></span>`);
               window.history.replaceState({}, '', window.location.pathname);
               return;
             }
