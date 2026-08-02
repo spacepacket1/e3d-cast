@@ -396,6 +396,31 @@ h2 {
   align-items: center;
 }
 
+.voice-picker-row {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  margin-top: 10px;
+}
+
+.voice-picker-row label {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+
+.voice-picker-row select {
+  font: inherit;
+  padding: 6px 8px;
+}
+
+.improve-transcript-row {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  margin-top: 10px;
+}
+
 .action-row {
   grid-template-columns: repeat(3, minmax(0, 1fr));
   margin-top: 20px;

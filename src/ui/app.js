@@ -164,13 +164,15 @@
       mode: 'transcript',
       preset: 'transcript_short',
       subtitleStyle: 'bold_mobile',
-      transcriptText: 'Host: Welcome to Cast.\nGuest: Today we are previewing a hosted render on E3D.',
+      transcriptText: 'Title: Time Tunnel\nHost: Welcome Time Traveller. Tell us your story.\nGuest: There I was, speeding through a wormhole, tumbling, and turning along the way.\nHost: It must have been scary. How long did it last?\nGuest: It felt like an eternity, but it really only lasted for a couple of seconds.\nHost: Do you remember any details?',
       sourceUrl: '',
       upload: null,
       uploadBusy: false,
       uploadError: '',
       uploadProgress: 0,
       transcriptionEngine: 'assemblyai',
+      hostVoiceGender: 'male',
+      guestVoiceGender: 'female',
       selectedSampleId: samples[0].id,
       title: 'Cast transcript short',
       description: 'Preview subtitle style, watermark state, metadata, and pricing before spend.',
@@ -180,6 +182,7 @@
       madeWithCast: true,
       freeSampleAttemptsUsed: 0,
       quote: null,
+      improveQuote: null,
       purchaseQuote: null,
       jobs: [],
       selectedJobId: '',
@@ -208,6 +211,8 @@
       transcriptText: state.transcriptText,
       sourceUrl: state.sourceUrl,
       transcriptionEngine: state.transcriptionEngine,
+      hostVoiceGender: state.hostVoiceGender,
+      guestVoiceGender: state.guestVoiceGender,
       selectedSampleId: state.selectedSampleId,
       title: state.title,
       description: state.description,
@@ -291,6 +296,7 @@
       brandEndCard: state.brandEndCard,
       archiveToIpfs: state.archiveToIpfs,
       transcriptText: state.transcriptText,
+      voices: { host: state.hostVoiceGender, guest: state.guestVoiceGender },
       title: state.title,
       description: state.description,
       tags: state.tags.split(',').map((value) => value.trim()).filter(Boolean),
@@ -633,8 +639,27 @@
 
     const maxChars = state.capabilities ? (state.capabilities.tiers.find((tier) => tier.id === currentTier()) || state.capabilities.tiers[1]).maxTranscriptChars : 20000;
     els.inputModePanel.innerHTML = `
-      <textarea id="transcript-input" class="text-area" placeholder="Host: ...&#10;Guest: ...">${state.transcriptText}</textarea>
+      <textarea id="transcript-input" class="text-area" placeholder="Title: ... (optional)&#10;Host: ...&#10;Guest: ...">${state.transcriptText}</textarea>
       <div id="transcript-length" class="small">Transcript length: ${state.transcriptText.length} / ${maxChars} characters for ${currentTier()} tier.</div>
+      <div class="voice-picker-row">
+        <label class="small">Host voice
+          <select id="host-voice-gender">
+            <option value="male" ${state.hostVoiceGender === 'male' ? 'selected' : ''}>Male</option>
+            <option value="female" ${state.hostVoiceGender === 'female' ? 'selected' : ''}>Female</option>
+          </select>
+        </label>
+        <label class="small">Guest voice
+          <select id="guest-voice-gender">
+            <option value="male" ${state.guestVoiceGender === 'male' ? 'selected' : ''}>Male</option>
+            <option value="female" ${state.guestVoiceGender === 'female' ? 'selected' : ''}>Female</option>
+          </select>
+        </label>
+      </div>
+      <div class="improve-transcript-row">
+        <button id="improve-transcript-btn" class="button ghost" type="button">Make it better with AI</button>
+        <span id="improve-transcript-status" class="small"></span>
+      </div>
+      <div id="improve-transcript-panel"></div>
     `;
     document.querySelector('#transcript-input').addEventListener('input', (event) => {
       state.transcriptText = event.target.value;
@@ -644,6 +669,91 @@
       // text needs to change here.
       document.querySelector('#transcript-length').textContent = `Transcript length: ${state.transcriptText.length} / ${maxChars} characters for ${currentTier()} tier.`;
     });
+    document.querySelector('#host-voice-gender').addEventListener('change', (event) => {
+      state.hostVoiceGender = event.target.value;
+      persistState();
+    });
+    document.querySelector('#guest-voice-gender').addEventListener('change', (event) => {
+      state.guestVoiceGender = event.target.value;
+      persistState();
+    });
+    document.querySelector('#improve-transcript-btn').addEventListener('click', quoteImproveTranscript);
+    renderImproveTranscriptPanel();
+  }
+
+  function renderImproveTranscriptPanel() {
+    const panel = document.querySelector('#improve-transcript-panel');
+    if (!panel) return;
+    if (!state.improveQuote) {
+      panel.innerHTML = '';
+      return;
+    }
+    panel.innerHTML = `
+      <div class="manifest-box">
+        Rewriting this transcript with AI will use <strong>${state.improveQuote.estimatedCredits} credits</strong>.
+        <div class="chip-row">
+          <button id="improve-transcript-confirm" class="button primary" type="button">Do It</button>
+          <button id="improve-transcript-cancel" class="button ghost" type="button">Cancel</button>
+        </div>
+      </div>
+    `;
+    panel.querySelector('#improve-transcript-confirm').addEventListener('click', applyImproveTranscript);
+    panel.querySelector('#improve-transcript-cancel').addEventListener('click', () => {
+      state.improveQuote = null;
+      renderImproveTranscriptPanel();
+    });
+  }
+
+  async function quoteImproveTranscript() {
+    const text = state.transcriptText.trim();
+    const statusEl = document.querySelector('#improve-transcript-status');
+    if (!text) {
+      if (statusEl) statusEl.textContent = 'Add some transcript text first';
+      return;
+    }
+    if (statusEl) statusEl.textContent = 'Quoting…';
+    try {
+      state.improveQuote = await apiJson('/api/cast/transcript/improve/quote', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ text }),
+      });
+      if (statusEl) statusEl.textContent = '';
+    } catch (error) {
+      state.improveQuote = null;
+      if (statusEl) statusEl.textContent = (error.payload && error.payload.error) || error.message;
+    }
+    renderImproveTranscriptPanel();
+  }
+
+  async function applyImproveTranscript() {
+    const statusEl = document.querySelector('#improve-transcript-status');
+    if (!state.creditKey) {
+      if (statusEl) statusEl.textContent = 'Add a credit key or buy credits first';
+      return;
+    }
+    if (statusEl) statusEl.textContent = 'Improving with AI…';
+    try {
+      const result = await apiJson('/api/cast/transcript/improve', {
+        method: 'POST',
+        headers: {
+          authorization: `Bearer ${state.creditKey}`,
+          'idempotency-key': `ui-improve-${Date.now()}`,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({ text: state.transcriptText.trim() }),
+      });
+      state.transcriptText = result.improvedText;
+      state.improveQuote = null;
+      persistState();
+      renderInputPanel();
+      const refreshedStatus = document.querySelector('#improve-transcript-status');
+      if (refreshedStatus) refreshedStatus.textContent = `Improved — ${result.creditsSpent} credits used`;
+      await refreshBalance();
+    } catch (error) {
+      if (statusEl) statusEl.textContent = (error.payload && error.payload.error) || error.message;
+      renderImproveTranscriptPanel();
+    }
   }
 
   function renderPresetGrid() {
@@ -790,7 +900,7 @@
       return `
       <button class="job-row ${job.jobId === state.selectedJobId ? 'active' : ''}" data-job="${job.jobId}">
         <strong>${job.title || job.jobId}</strong>
-        <span class="small">${status}${isActive ? ' — checking for updates…' : ''} • ${job.tier || 'free'} • ${job.source || job.inputKind}</span>
+        <span class="small">${status}${isActive ? ` — ${jobProgressLabel(job)}` : ''} • ${job.tier || 'free'} • ${job.source || job.inputKind}</span>
       </button>
     `;
     }).join('');
@@ -836,6 +946,16 @@
 
   function jobStatus(job) {
     return (job.remoteStatus && job.remoteStatus.status) || job.status;
+  }
+
+  // The worker reports coarse phases (e.g. "transcribe", "render") via
+  // job.progress events; fall back to a generic message until the first one
+  // lands so the row doesn't look stuck with no text at all.
+  function jobProgressLabel(job) {
+    const phase = job.remoteStatus && job.remoteStatus.progressPhase;
+    if (!phase) return 'checking for updates…';
+    const detail = job.remoteStatus && job.remoteStatus.progressDetail;
+    return detail ? `${phase}: ${detail}` : phase;
   }
 
   // Jobs render synchronously at submission time (status "queued"/"running")
@@ -942,7 +1062,7 @@
     els.jobDetail.innerHTML = `
       <div class="info-stack">
         <strong>${job.title || job.jobId}</strong>
-        <span>Status: ${detail.status}${!TERMINAL_JOB_STATUSES.has(detail.status) && job.kind !== 'local-sample' ? ' (auto-refreshing every few seconds)' : ''}</span>
+        <span>Status: ${detail.status}${!TERMINAL_JOB_STATUSES.has(detail.status) && job.kind !== 'local-sample' ? ` — ${jobProgressLabel(job)} (auto-refreshing every few seconds)` : ''}</span>
         <span>Preset: ${detail.outputPreset || job.preset || state.preset}</span>
         <span>Holder discount: ${detail.holderDiscountApplied ? 'applied' : 'not applied'}</span>
         <span>Artifact retention: ${detail.artifactExpiresAt || 'local sample'}</span>
@@ -1110,9 +1230,10 @@ ${Object.keys(archive).length ? `\n${JSON.stringify(archive, null, 2)}` : '\nCon
     const title = els.heroCta.querySelector('h2');
     const copy = els.heroCta.querySelector('.hero-cta-copy .small');
     if (funded) {
-      const credits = state.creditBalance == null ? 'credits ready' : `${state.creditBalance} credits ready`;
+      // Credit count is shown in the Credits status card below -- no need to
+      // repeat it here too.
       if (title) title.textContent = 'You are funded — create a video';
-      if (copy) copy.textContent = `${credits}. Paste a transcript or upload audio, get a quote, then Create Video.`;
+      if (copy) copy.textContent = 'Paste a transcript or upload audio, get a quote, then Create Video.';
     } else {
       if (title) title.textContent = 'Your first videos for $9';
       if (copy) {

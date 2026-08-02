@@ -103,6 +103,14 @@ async function downloadUrlToFile(url, destinationPath) {
   fs.writeFileSync(destinationPath, Buffer.from(await response.arrayBuffer()));
 }
 
+function sanitizeVoiceGenders(voices) {
+  if (!voices || typeof voices !== 'object') return undefined;
+  const clean = {};
+  if (voices.host === 'male' || voices.host === 'female') clean.host = voices.host;
+  if (voices.guest === 'male' || voices.guest === 'female') clean.guest = voices.guest;
+  return Object.keys(clean).length ? clean : undefined;
+}
+
 async function buildWorkerManifest(job, config) {
   const tier = TIER_CONFIG[job.tier] || TIER_CONFIG.starter;
   const manifest = {
@@ -118,6 +126,7 @@ async function buildWorkerManifest(job, config) {
     options: {
       subtitleStyle: (job.options && job.options.subtitleStyle) || 'clean_podcast',
       voicePreset: job.options && job.options.voicePreset,
+      voices: sanitizeVoiceGenders(job.options && job.options.voices),
       generateThumbnail: job.options && job.options.generateThumbnail === false ? false : true,
       brandEndCard: job.options && job.options.brandEndCard === false ? false : true,
       archiveToIpfs: !!(job.options && job.options.archiveToIpfs),
@@ -230,7 +239,7 @@ function claimJob(storageDir, jobId) {
   return job;
 }
 
-function copyArtifactToStore(storageDir, jobId, artifact) {
+function copyArtifactToStore(storageDir, jobId, artifact, creditsUsed) {
   const targetDir = artifactStoreDir(storageDir, jobId);
   ensureDir(targetDir);
   const normalizedId = normalizeArtifactId(artifact.artifactId);
@@ -247,6 +256,7 @@ function copyArtifactToStore(storageDir, jobId, artifact) {
     path: targetPath,
     ipfsUri: artifact.ipfsUri || null,
     gatewayUrl: artifact.gatewayUrl || null,
+    creditsUsed,
   };
 }
 
@@ -264,7 +274,17 @@ function finalizeJobSuccess(job, config) {
   job.errorMessage = '';
   job.artifactExpiresAt = artifactManifest.localRetentionExpiresAt || null;
   job.artifactManifestUrl = `/api/cast/jobs/${job.jobId}/artifacts`;
-  job.artifacts = artifactManifest.artifacts.map((artifact) => copyArtifactToStore(config.storageDir, job.jobId, artifact));
+  // The job is billed as a single flat charge for the whole render (see
+  // estimateCredits() in pod2vidRoutes.js) -- there's no separate cost driver
+  // per artifact, so the full spend is attributed to the video (the actual
+  // deliverable) and every other artifact (captions, thumbnail, metadata,
+  // manifest, ...) is a free byproduct of that same render.
+  job.artifacts = artifactManifest.artifacts.map((artifact) => copyArtifactToStore(
+    config.storageDir,
+    job.jobId,
+    artifact,
+    normalizeArtifactId(artifact.artifactId) === 'video' ? Number(job.spentCredits || 0) : 0,
+  ));
   job.actualArtifactBytes = job.artifacts.reduce((sum, artifact) => sum + Number(artifact.bytes || 0), 0);
   if (archiveManifest) {
     job.localArchiveManifestPath = archiveManifestPath;
@@ -295,6 +315,12 @@ function parseProgressLine(job, rawLine) {
     }
     if (payload.event === 'job.completed') {
       appendLog(job, `Worker result: ${payload.status}`);
+      return;
+    }
+    if (payload.event === 'job.progress') {
+      job.progressPhase = String(payload.phase || '');
+      job.progressDetail = String(payload.detail || '');
+      appendLog(job, `${job.progressPhase}${job.progressDetail ? `: ${job.progressDetail}` : ''}`);
       return;
     }
     appendLog(job, `${payload.event || 'worker.event'} ${JSON.stringify(payload)}`);

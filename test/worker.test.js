@@ -85,6 +85,7 @@ fs.writeFileSync(path.join(jobDir, 'result.json'), JSON.stringify({
   finishedAt: '2026-07-01T00:00:00.000Z'
 }, null, 2));
 console.log(JSON.stringify({ event: 'job.started', jobId: manifest.jobId }));
+console.log(JSON.stringify({ event: 'job.progress', phase: 'render', detail: 'Running pod2vid.py' }));
 console.log(JSON.stringify({ event: 'job.completed', jobId: manifest.jobId, status: 'succeeded' }));
 `);
   fs.chmodSync(runnerPath, 0o755);
@@ -114,6 +115,7 @@ console.log(JSON.stringify({ event: 'job.completed', jobId: manifest.jobId, stat
       brandEndCard: true,
       archiveToIpfs: false,
     },
+    spentCredits: 500,
     webhookStatus: 'none',
     webhookAttempts: [],
   }, null, 2));
@@ -135,4 +137,19 @@ console.log(JSON.stringify({ event: 'job.completed', jobId: manifest.jobId, stat
   assert.ok(stored.artifacts.some((artifact) => artifact.artifactId === 'video'));
   assert.ok(stored.artifacts.some((artifact) => artifact.artifactId === 'manifest'));
   assert.ok(fs.existsSync(path.join(storageDir, 'artifacts', 'cast_job_test', 'video.mp4')));
+  assert.strictEqual(stored.progressPhase, 'render');
+  assert.strictEqual(stored.progressDetail, 'Running pod2vid.py');
+
+  // The job is billed as one flat charge for the whole render -- that spend
+  // must land entirely on the video artifact, with every other (free
+  // byproduct) artifact tagged 0, so per-artifact credit totals stay
+  // consistent with job.spentCredits.
+  const video = stored.artifacts.find((artifact) => artifact.artifactId === 'video');
+  const manifestArtifact = stored.artifacts.find((artifact) => artifact.artifactId === 'manifest');
+  assert.strictEqual(video.creditsUsed, 500);
+  assert.strictEqual(manifestArtifact.creditsUsed, 0);
+  assert.strictEqual(
+    stored.artifacts.reduce((sum, artifact) => sum + Number(artifact.creditsUsed || 0), 0),
+    stored.spentCredits,
+  );
 });
