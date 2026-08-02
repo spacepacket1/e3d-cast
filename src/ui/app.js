@@ -1032,7 +1032,7 @@ ${Object.keys(archive).length ? `\n${JSON.stringify(archive, null, 2)}` : '\nCon
       if (title) title.textContent = 'You are funded — create a video';
       if (copy) copy.textContent = `${credits}. Paste a transcript or upload audio, get a quote, then Create Video.`;
     } else {
-      if (title) title.textContent = 'Your first videos for $19';
+      if (title) title.textContent = 'Your first videos for $9';
       if (copy) {
         copy.textContent = 'Starter pack = 2,000 credits (~4 YouTube-length renders). Card checkout via Stripe. Free sample render available with no purchase.';
       }
