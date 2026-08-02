@@ -700,6 +700,15 @@ dialog::backdrop {
   margin-top: 8px;
 }
 
+.wallet-row {
+  display: flex;
+  gap: 8px;
+}
+
+.wallet-row .button {
+  margin-top: 0;
+}
+
 @media (max-width: 1120px) {
   .workspace-grid,
   .lower-grid,

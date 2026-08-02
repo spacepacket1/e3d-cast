@@ -911,8 +911,7 @@
         <button class="button ghost" data-archive="ipfs">Archive to IPFS</button>
       </div>
       <div class="manifest-box">IPFS archive status: ${detail.ipfsArchiveStatus || (job.kind === 'local-sample' ? 'local sample only' : 'not archived')}
-${Object.keys(archive).length ? `\n${JSON.stringify(archive, null, 2)}` : '\nConsent required before archive.'}
-\nNFT mint available: false</div>
+${Object.keys(archive).length ? `\n${JSON.stringify(archive, null, 2)}` : '\nConsent required before archive.'}</div>
     `;
     els.jobDetail.querySelectorAll('[data-open-artifact]').forEach((button) => {
       button.addEventListener('click', () => {

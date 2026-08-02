@@ -35,8 +35,6 @@
           </div>
           <div class="topbar-actions">
             <button id="buy-credits-cta" class="button primary" type="button">Buy credits — from $9</button>
-            <button id="connect-wallet" class="button secondary">Connect Wallet</button>
-            <a id="get-e3d-link" class="button ghost" target="_blank" rel="noreferrer">Get E3D</a>
           </div>
         </div>
         <p class="subhead">Turn podcast audio or a transcript into a finished video. Pay with a card — no wallet required. Agents can still pay in E3D.</p>
@@ -157,6 +155,10 @@
 
               <details class="crypto-payments">
                 <summary>Pay with E3D / wE3D (advanced)</summary>
+                <div class="wallet-row">
+                  <button id="connect-wallet" class="button secondary">Connect Wallet</button>
+                  <a id="get-e3d-link" class="button ghost" target="_blank" rel="noreferrer">Get E3D</a>
+                </div>
                 <label for="credit-request" class="field-label">Credits to purchase</label>
                 <input id="credit-request" class="text-input" type="number" min="100" step="100" value="1000">
                 <button id="quote-purchase" class="button secondary">Quote credit purchase</button>
