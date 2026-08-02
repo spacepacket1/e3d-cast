@@ -634,12 +634,15 @@
     const maxChars = state.capabilities ? (state.capabilities.tiers.find((tier) => tier.id === currentTier()) || state.capabilities.tiers[1]).maxTranscriptChars : 20000;
     els.inputModePanel.innerHTML = `
       <textarea id="transcript-input" class="text-area" placeholder="Host: ...&#10;Guest: ...">${state.transcriptText}</textarea>
-      <div class="small">Transcript length: ${state.transcriptText.length} / ${maxChars} characters for ${currentTier()} tier.</div>
+      <div id="transcript-length" class="small">Transcript length: ${state.transcriptText.length} / ${maxChars} characters for ${currentTier()} tier.</div>
     `;
     document.querySelector('#transcript-input').addEventListener('input', (event) => {
       state.transcriptText = event.target.value;
       persistState();
-      renderInputPanel();
+      // Rewriting innerHTML (as a full renderInputPanel() would) replaces the
+      // textarea node on every keystroke and drops focus -- only the counter
+      // text needs to change here.
+      document.querySelector('#transcript-length').textContent = `Transcript length: ${state.transcriptText.length} / ${maxChars} characters for ${currentTier()} tier.`;
     });
   }
 
