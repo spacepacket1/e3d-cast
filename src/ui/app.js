@@ -784,21 +784,29 @@
       els.jobsList.innerHTML = '<div class="empty-state">Recent jobs stay here for resume, revision, archive, and artifact download.</div>';
       return;
     }
-    els.jobsList.innerHTML = state.jobs.map((job) => `
+    els.jobsList.innerHTML = state.jobs.map((job) => {
+      const status = jobStatus(job);
+      const isActive = !TERMINAL_JOB_STATUSES.has(status) && job.kind !== 'local-sample';
+      return `
       <button class="job-row ${job.jobId === state.selectedJobId ? 'active' : ''}" data-job="${job.jobId}">
         <strong>${job.title || job.jobId}</strong>
-        <span class="small">${job.status} • ${job.tier || 'free'} • ${job.source || job.inputKind}</span>
+        <span class="small">${status}${isActive ? ' — checking for updates…' : ''} • ${job.tier || 'free'} • ${job.source || job.inputKind}</span>
       </button>
-    `).join('');
+    `;
+    }).join('');
     els.jobsList.querySelectorAll('[data-job]').forEach((button) => {
       button.addEventListener('click', async () => {
         state.selectedJobId = button.dataset.job;
         persistState();
         renderJobs();
         const job = selectedJob();
-        if (job && job.kind !== 'local-sample' && !job.remoteStatus && (state.creditKey || walletProofIsFresh())) {
+        if (job && job.kind !== 'local-sample' && (state.creditKey || walletProofIsFresh())) {
           try {
-            await fetchRemoteJob(job);
+            if (!TERMINAL_JOB_STATUSES.has(jobStatus(job))) {
+              await pollJobStatus(job);
+            } else if (!job.remoteStatus) {
+              await fetchRemoteJob(job);
+            }
           } catch (error) {
             els.jobDetail.innerHTML = `<div class="manifest-box">${error.message}\n\nIf this job wasn't created with your current credit key, click "Load my jobs" first to prove wallet ownership.</div>`;
             return;
@@ -820,6 +828,49 @@
     job.remoteStatus = status;
     job.artifacts = artifacts.artifacts;
     return job;
+  }
+
+  const TERMINAL_JOB_STATUSES = new Set(['succeeded', 'failed', 'cancelled']);
+  const JOB_POLL_INTERVAL_MS = 5000;
+  const pollingJobIds = new Set();
+
+  function jobStatus(job) {
+    return (job.remoteStatus && job.remoteStatus.status) || job.status;
+  }
+
+  // Jobs render synchronously at submission time (status "queued"/"running")
+  // with no further update -- without this, the UI freezes on that first
+  // snapshot until the user happens to reopen the job, which for a real
+  // render (minutes, not seconds) reads as "did this do anything at all?"
+  async function pollJobStatus(job, { silent } = {}) {
+    if (job.kind === 'local-sample' || pollingJobIds.has(job.jobId)) return;
+    pollingJobIds.add(job.jobId);
+    const tick = async (isFirstAttempt) => {
+      try {
+        await fetchRemoteJob(job);
+      } catch (error) {
+        pollingJobIds.delete(job.jobId);
+        if (isFirstAttempt && !silent) throw error;
+        return;
+      }
+      persistState();
+      renderJobs();
+      if (selectedJob() === job) renderJobDetail();
+      if (TERMINAL_JOB_STATUSES.has(jobStatus(job))) {
+        pollingJobIds.delete(job.jobId);
+        return;
+      }
+      setTimeout(tick, JOB_POLL_INTERVAL_MS);
+    };
+    await tick(true);
+  }
+
+  function resumePollingForActiveJobs() {
+    if (!(state.creditKey || walletProofIsFresh())) return;
+    state.jobs.forEach((job) => {
+      if (job.kind === 'local-sample' || TERMINAL_JOB_STATUSES.has(jobStatus(job))) return;
+      pollJobStatus(job, { silent: true }).catch(() => {});
+    });
   }
 
   const TEXT_ARTIFACT_TYPES = new Set(['application/x-subrip', 'text/plain']);
@@ -891,7 +942,7 @@
     els.jobDetail.innerHTML = `
       <div class="info-stack">
         <strong>${job.title || job.jobId}</strong>
-        <span>Status: ${detail.status}</span>
+        <span>Status: ${detail.status}${!TERMINAL_JOB_STATUSES.has(detail.status) && job.kind !== 'local-sample' ? ' (auto-refreshing every few seconds)' : ''}</span>
         <span>Preset: ${detail.outputPreset || job.preset || state.preset}</span>
         <span>Holder discount: ${detail.holderDiscountApplied ? 'applied' : 'not applied'}</span>
         <span>Artifact retention: ${detail.artifactExpiresAt || 'local sample'}</span>
@@ -1471,7 +1522,7 @@ ${Object.keys(archive).length ? `\n${JSON.stringify(archive, null, 2)}` : '\nCon
     state.jobs.unshift(job);
     state.selectedJobId = job.jobId;
     persistState();
-    await fetchRemoteJob(job);
+    await pollJobStatus(job);
     await refreshBalance();
     render();
     els.jobDetail.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -1536,7 +1587,7 @@ ${Object.keys(archive).length ? `\n${JSON.stringify(archive, null, 2)}` : '\nCon
     state.jobs.unshift(child);
     state.selectedJobId = child.jobId;
     persistState();
-    await fetchRemoteJob(child);
+    await pollJobStatus(child);
     render();
   }
 
@@ -1663,13 +1714,12 @@ ${Object.keys(archive).length ? `\n${JSON.stringify(archive, null, 2)}` : '\nCon
     if (state.selectedJobId) {
       const job = selectedJob();
       if (job && job.kind !== 'local-sample' && state.creditKey) {
-        try {
-          await fetchRemoteJob(job);
-        } catch (_error) {
-          // Keep the cached local job entry visible if the remote lookup fails.
-        }
+        await pollJobStatus(job, { silent: true });
       }
     }
+    // Resume live status checks for any other still-running jobs from a
+    // previous visit (e.g. reloading the page mid-render).
+    resumePollingForActiveJobs();
 
     await loadStripePacks();
     // Handle return from Stripe Checkout before first paint of payment panel status.
