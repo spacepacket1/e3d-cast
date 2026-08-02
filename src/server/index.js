@@ -167,7 +167,7 @@ async function forwardServiceCall(req, res, targetBaseUrl, serviceToken) {
   // without it, so a missing token must not block those routes entirely.
   const routePath = req.url.replace(/^\/ui-api/, '/api');
   const target = new URL(routePath, targetBaseUrl);
-  const body = await readBody(req);
+  const body = ['GET', 'HEAD'].includes(req.method) ? undefined : await readBody(req);
   const response = await fetch(target, {
     method: req.method,
     headers: proxyHeaders(req.headers, {

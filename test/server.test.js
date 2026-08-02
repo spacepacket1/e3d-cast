@@ -176,6 +176,43 @@ test('forwardServiceCall never relays Origin or Connection to the upstream API',
   }
 });
 
+test('forwardServiceCall does not attach a body to GET/HEAD requests', async () => {
+  // Regression coverage: readBody() always resolves to a Buffer (empty for
+  // bodyless requests), and Node's fetch() throws "Request with GET/HEAD
+  // method cannot have body" if body is anything but undefined/null on a
+  // GET/HEAD request. That crashed every GET call proxied through here --
+  // including /ui-api/payments/stripe/packs and the
+  // /ui-api/payments/stripe/session/:id/result poll a browser uses to claim
+  // credits after a real Stripe payment -- and surfaced as a 504 behind
+  // nginx rather than a clear error.
+  const upstream = http.createServer((req, res) => {
+    res.setHeader('content-type', 'application/json');
+    res.end(JSON.stringify({ ok: true, method: req.method }));
+  });
+  const upstreamPort = await listen(upstream);
+
+  const uiDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cast-ui-'));
+  const uploadDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cast-upload-'));
+  const server = createServer({
+    rootDir: uiDir,
+    uiDir,
+    uploadDir,
+    spacepacketApiUrl: `http://127.0.0.1:${upstreamPort}`,
+  });
+  const port = await listen(server);
+
+  try {
+    const response = await rawHttpRequest(`http://127.0.0.1:${port}/ui-api/payments/stripe/packs`, {
+      method: 'GET',
+    });
+    assert.strictEqual(response.statusCode, 200);
+    assert.deepStrictEqual(JSON.parse(response.body), { ok: true, method: 'GET' });
+  } finally {
+    await close(server);
+    await close(upstream);
+  }
+});
+
 test('/samples/* serves public assets with Range support and rejects path traversal', async () => {
   const uiDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cast-ui-'));
   const uploadDir = fs.mkdtempSync(path.join(os.tmpdir(), 'cast-upload-'));
