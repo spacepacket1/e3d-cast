@@ -35,6 +35,25 @@
     const preset = presets.find((entry) => entry.id === id);
     return preset ? preset.title : (id || 'n/a');
   }
+
+  // Prefers the server's createdAt (authoritative, present once remoteStatus
+  // has loaded) but falls back to the local timestamp stamped at creation
+  // time (see trackNewJob) so a just-created row shows a date immediately
+  // instead of waiting on the first poll/fetch.
+  function formatJobDate(job) {
+    const raw = (job.remoteStatus && job.remoteStatus.createdAt) || job.createdAt;
+    if (!raw) return '';
+    const date = new Date(raw);
+    if (Number.isNaN(date.getTime())) return '';
+    const today = new Date();
+    const isToday = date.toDateString() === today.toDateString();
+    return date.toLocaleString(undefined, {
+      month: isToday ? undefined : 'short',
+      day: isToday ? undefined : 'numeric',
+      hour: 'numeric',
+      minute: '2-digit',
+    });
+  }
   const presets = [
     { id: 'short', title: 'Short', aspect: '9:16', copy: 'Mobile-first clips with captions and watermark-aware defaults.' },
     { id: 'youtube', title: 'YouTube video', aspect: '16:9', copy: 'Longer-form widescreen package with metadata and thumbnail.' },
@@ -1059,7 +1078,7 @@
       <div class="job-row-wrap">
         <button class="job-row ${isOpen ? 'active open' : ''}" data-job="${job.jobId}">
           <strong>${job.title || job.jobId}</strong>
-          <span class="small">${status}${isActive ? ` — ${jobProgressLabel(job)}` : ''} • ${job.tier || 'free'} • ${modeLabel(job.source || job.inputKind)}</span>
+          <span class="small">${status}${isActive ? ` — ${jobProgressLabel(job)}` : ''} • ${job.tier || 'free'} • ${modeLabel(job.source || job.inputKind)}${formatJobDate(job) ? ` • ${formatJobDate(job)}` : ''}</span>
         </button>
         ${isOpen ? `<div class="job-row-detail" data-job-detail="${job.jobId}">${jobDetailHtml(job)}</div>` : ''}
       </div>
@@ -1123,6 +1142,10 @@
   // ...) so a freshly created job always lands in Recent Jobs and gets selected
   // the same way regardless of which flow created it.
   function trackNewJob(job) {
+    // Stamped locally so the row has a date immediately -- the server's own
+    // createdAt (authoritative) arrives once remoteStatus loads and takes
+    // over from there (see formatJobDate).
+    job.createdAt = job.createdAt || new Date().toISOString();
     state.jobs.unshift(job);
     state.selectedJobId = job.jobId;
     persistState();
@@ -2012,7 +2035,7 @@ ${Object.keys(archive).length ? `\n${JSON.stringify(archive, null, 2)}` : '\nCon
     const sample = selectedSample();
     const jobId = `sample_${sample.id}_${Date.now()}`;
     state.freeSampleAttemptsUsed += 1;
-    state.jobs.unshift({
+    trackNewJob({
       jobId,
       kind: 'local-sample',
       title: sample.title,
@@ -2026,8 +2049,6 @@ ${Object.keys(archive).length ? `\n${JSON.stringify(archive, null, 2)}` : '\nCon
       ],
       ipfsArchiveStatus: 'not_available_for_local_sample',
     });
-    state.selectedJobId = jobId;
-    persistState();
     render();
     els.jobsList.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
@@ -2051,17 +2072,14 @@ ${Object.keys(archive).length ? `\n${JSON.stringify(archive, null, 2)}` : '\nCon
         },
       }),
     });
-    const child = {
+    const child = trackNewJob({
       jobId: submission.jobId,
       title: `${revisionType} revision`,
       status: submission.status,
       tier: submission.tier,
       preset: state.preset,
       inputKind: state.mode,
-    };
-    state.jobs.unshift(child);
-    state.selectedJobId = child.jobId;
-    persistState();
+    });
     await pollJobStatus(child);
     render();
   }
