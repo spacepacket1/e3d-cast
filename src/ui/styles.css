@@ -213,7 +213,10 @@ h2 {
 }
 
 .lower-grid {
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  /* Was a 2-column split for the old separate Recent Jobs / Job Detail
+     sections -- now wraps a single "My Videos" panel, so a single track
+     avoids leaving an empty half-width column beside it. */
+  grid-template-columns: 1fr;
   margin-bottom: 20px;
 }
 
@@ -273,7 +276,6 @@ h2 {
 .quote-panel,
 .info-stack,
 .jobs-list,
-.job-detail,
 .agent-mode {
   display: grid;
   gap: 12px;
@@ -527,6 +529,26 @@ h2 {
 
 .job-row:hover {
   border-color: var(--accent);
+}
+
+.job-row-wrap {
+  display: flex;
+  flex-direction: column;
+}
+
+.job-row.open {
+  border-radius: 18px 18px 0 0;
+  border-bottom-color: transparent;
+}
+
+.job-row-detail {
+  display: grid;
+  gap: 14px;
+  background: rgba(255, 255, 255, 0.6);
+  border: 1px solid var(--line);
+  border-top: none;
+  border-radius: 0 0 18px 18px;
+  padding: 16px;
 }
 
 .sample-card img {

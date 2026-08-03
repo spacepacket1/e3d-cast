@@ -166,7 +166,6 @@
     heroTryFree: document.querySelector('#hero-try-free'),
     jobsList: document.querySelector('#jobs-list'),
     loadWalletJobs: document.querySelector('#load-wallet-jobs'),
-    jobDetail: document.querySelector('#job-detail'),
     tokenBalances: document.querySelector('#token-balances'),
     paymentsInfo: document.querySelector('#payments-info'),
     paymentsInfoDialog: document.querySelector('#payments-info-dialog'),
@@ -1041,28 +1040,42 @@
     `;
   }
 
+  // "My Videos" merges what used to be two disconnected sections (a Recent
+  // Jobs list above a separate Job Detail/Artifacts panel) into one: each
+  // row expands its own detail inline, right below it, when clicked.
+  // Only one row is expanded at a time -- clicking an open row again (or
+  // clicking a different row) collapses it, since state.selectedJobId is a
+  // single value rather than a set of open ids.
   function renderJobs() {
     if (!state.jobs.length) {
-      els.jobsList.innerHTML = '<div class="empty-state">Recent jobs stay here for resume, revision, archive, and artifact download.</div>';
+      els.jobsList.innerHTML = '<div class="empty-state">Videos you create or load stay here — click one to see status, artifacts, and revision actions.</div>';
       return;
     }
     els.jobsList.innerHTML = state.jobs.map((job) => {
       const status = jobStatus(job);
       const isActive = !TERMINAL_JOB_STATUSES.has(status) && job.kind !== 'local-sample';
+      const isOpen = job.jobId === state.selectedJobId;
       return `
-      <button class="job-row ${job.jobId === state.selectedJobId ? 'active' : ''}" data-job="${job.jobId}">
-        <strong>${job.title || job.jobId}</strong>
-        <span class="small">${status}${isActive ? ` — ${jobProgressLabel(job)}` : ''} • ${job.tier || 'free'} • ${modeLabel(job.source || job.inputKind)}</span>
-      </button>
+      <div class="job-row-wrap">
+        <button class="job-row ${isOpen ? 'active open' : ''}" data-job="${job.jobId}">
+          <strong>${job.title || job.jobId}</strong>
+          <span class="small">${status}${isActive ? ` — ${jobProgressLabel(job)}` : ''} • ${job.tier || 'free'} • ${modeLabel(job.source || job.inputKind)}</span>
+        </button>
+        ${isOpen ? `<div class="job-row-detail" data-job-detail="${job.jobId}">${jobDetailHtml(job)}</div>` : ''}
+      </div>
     `;
     }).join('');
     els.jobsList.querySelectorAll('[data-job]').forEach((button) => {
       button.addEventListener('click', async () => {
-        state.selectedJobId = button.dataset.job;
+        const jobId = button.dataset.job;
+        const opening = state.selectedJobId !== jobId;
+        state.selectedJobId = opening ? jobId : '';
         persistState();
         renderJobs();
+        if (!opening) return;
         const job = selectedJob();
-        if (job && job.kind !== 'local-sample' && (state.creditKey || walletProofIsFresh())) {
+        if (!job) return;
+        if (job.kind !== 'local-sample' && (state.creditKey || walletProofIsFresh())) {
           try {
             if (!TERMINAL_JOB_STATUSES.has(jobStatus(job))) {
               await pollJobStatus(job);
@@ -1070,13 +1083,19 @@
               await fetchRemoteJob(job);
             }
           } catch (error) {
-            els.jobDetail.innerHTML = `<div class="manifest-box">${error.message}\n\nIf this job wasn't created with your current credit key, click "Load my jobs" first to prove wallet ownership.</div>`;
+            const detailEl = els.jobsList.querySelector(`[data-job-detail="${job.jobId}"]`);
+            if (detailEl) detailEl.innerHTML = `<div class="manifest-box">${error.message}\n\nIf this job wasn't created with your current credit key, click "Load my jobs" first to prove wallet ownership.</div>`;
             return;
           }
         }
-        renderJobDetail();
+        renderJobs();
       });
     });
+    const openJob = selectedJob();
+    if (openJob) {
+      const detailEl = els.jobsList.querySelector(`[data-job-detail="${openJob.jobId}"]`);
+      if (detailEl) wireJobDetail(detailEl, openJob);
+    }
   }
 
   function selectedJob() {
@@ -1137,7 +1156,6 @@
       }
       persistState();
       renderJobs();
-      if (selectedJob() === job) renderJobDetail();
       if (TERMINAL_JOB_STATUSES.has(jobStatus(job))) {
         pollingJobIds.delete(job.jobId);
         return;
@@ -1180,8 +1198,8 @@
     setTimeout(() => URL.revokeObjectURL(objectUrl), 4000);
   }
 
-  async function openArtifact(job, artifact) {
-    const preview = document.querySelector('#artifact-preview');
+  async function openArtifact(container, job, artifact) {
+    const preview = container.querySelector('[data-artifact-preview]');
     if (!preview) return;
     preview.hidden = false;
     // Public sample video is served directly from a static, unauthenticated
@@ -1225,9 +1243,9 @@
     }
   }
 
-  async function sendCard(job) {
-    const statusEl = document.querySelector('#send-card-status');
-    const button = els.jobDetail.querySelector('[data-send-card]');
+  async function sendCard(container, job) {
+    const statusEl = container.querySelector('[data-send-card-status]');
+    const button = container.querySelector('[data-send-card]');
     if (button) button.disabled = true;
     if (statusEl) statusEl.textContent = 'Sending…';
     try {
@@ -1237,25 +1255,23 @@
         body: JSON.stringify({}),
       });
       await fetchRemoteJob(job);
-      renderJobDetail();
+      renderJobs();
     } catch (error) {
       if (button) button.disabled = false;
       if (statusEl) statusEl.textContent = `Failed: ${(error.payload && error.payload.error) || error.message}`;
     }
   }
 
-  function renderJobDetail() {
-    const job = selectedJob();
-    if (!job) {
-      els.jobDetail.innerHTML = 'Select a recent job to inspect artifacts, archive it to IPFS, or run revision actions.';
-      return;
-    }
+  // Returns just the inner HTML for one job's expanded detail -- called from
+  // renderJobs() for whichever row is currently open (state.selectedJobId),
+  // so "My Videos" can render the list and the open row's detail as one
+  // pass instead of two disconnected sections/functions.
+  function jobDetailHtml(job) {
     const detail = job.remoteStatus || job;
     const artifacts = job.artifacts || [];
     const archive = detail.ipfsArchiveUris || job.ipfs || {};
-    els.jobDetail.innerHTML = `
+    return `
       <div class="info-stack">
-        <strong>${job.title || job.jobId}</strong>
         <span>Mode: ${modeLabel(job.inputKind || detail.inputKind)}</span>
         <span>Status: ${detail.status}${!TERMINAL_JOB_STATUSES.has(detail.status) && job.kind !== 'local-sample' ? ` — ${jobProgressLabel(job)} (auto-refreshing every few seconds)` : ''}</span>
         <span>Format: ${presetLabel(detail.outputPreset || job.preset || state.preset)}</span>
@@ -1272,7 +1288,7 @@
           </article>
         `).join('')}
       </div>
-      <div id="artifact-preview" class="manifest-box" hidden></div>
+      <div class="manifest-box" data-artifact-preview hidden></div>
       ${detail.recipientEmail ? `
         <div class="manifest-box">
           ${detail.cardEmailSentAt ? `
@@ -1282,7 +1298,7 @@
             <button class="button primary" data-send-card type="button" ${detail.status === 'succeeded' ? '' : 'disabled'}>Send card to ${detail.recipientEmail}</button>
             <div class="small">${detail.status === 'succeeded' ? 'Preview it with "Play video" above first if you like.' : 'Waiting for the video to finish rendering…'}</div>
           `}
-          <span id="send-card-status" class="small"></span>
+          <span data-send-card-status class="small"></span>
         </div>
       ` : ''}
       <div class="chip-row">
@@ -1294,18 +1310,25 @@
       <div class="manifest-box">IPFS archive status: ${detail.ipfsArchiveStatus || (job.kind === 'local-sample' ? 'local sample only' : 'not archived')}
 ${Object.keys(archive).length ? `\n${JSON.stringify(archive, null, 2)}` : '\nConsent required before archive.'}</div>
     `;
-    els.jobDetail.querySelectorAll('[data-open-artifact]').forEach((button) => {
+  }
+
+  // Wires up the buttons inside one open row's detail block, scoped to that
+  // row's own container -- multiple job rows can exist in the DOM at once
+  // (collapsed), so these can no longer be looked up as page-global ids.
+  function wireJobDetail(container, job) {
+    const artifacts = job.artifacts || [];
+    container.querySelectorAll('[data-open-artifact]').forEach((button) => {
       button.addEventListener('click', () => {
         const artifact = artifacts.find((entry) => entry.artifactId === button.dataset.openArtifact);
-        if (artifact) openArtifact(job, artifact);
+        if (artifact) openArtifact(container, job, artifact);
       });
     });
-    const sendCardButton = els.jobDetail.querySelector('[data-send-card]');
-    if (sendCardButton) sendCardButton.addEventListener('click', () => sendCard(job));
-    els.jobDetail.querySelectorAll('[data-revision]').forEach((button) => {
+    const sendCardButton = container.querySelector('[data-send-card]');
+    if (sendCardButton) sendCardButton.addEventListener('click', () => sendCard(container, job));
+    container.querySelectorAll('[data-revision]').forEach((button) => {
       button.addEventListener('click', () => runRevision(job, button.dataset.revision));
     });
-    const archiveButton = els.jobDetail.querySelector('[data-archive]');
+    const archiveButton = container.querySelector('[data-archive]');
     if (archiveButton) archiveButton.addEventListener('click', () => archiveJob(job));
   }
 
@@ -1923,7 +1946,7 @@ ${Object.keys(archive).length ? `\n${JSON.stringify(archive, null, 2)}` : '\nCon
     await pollJobStatus(job);
     await refreshBalance();
     render();
-    els.jobDetail.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    els.jobsList.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
 
   // Card/podcast generation doesn't hook into the wallet auto-fund flow (that
@@ -1973,11 +1996,11 @@ ${Object.keys(archive).length ? `\n${JSON.stringify(archive, null, 2)}` : '\nCon
     });
     await pollJobStatus(job);
     // The card email is no longer sent automatically here -- the sender gets
-    // a "Send card" button in the job detail panel (see renderJobDetail())
+    // a "Send card" button in the video's expanded row (see jobDetailHtml())
     // so they can watch the video first and back out if it's not right.
     await refreshBalance();
     render();
-    els.jobDetail.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    els.jobsList.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
 
   function createLocalSampleJob() {
@@ -2006,7 +2029,7 @@ ${Object.keys(archive).length ? `\n${JSON.stringify(archive, null, 2)}` : '\nCon
     state.selectedJobId = jobId;
     persistState();
     render();
-    els.jobDetail.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+    els.jobsList.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
 
   async function runRevision(job, revisionType) {
@@ -2057,7 +2080,7 @@ ${Object.keys(archive).length ? `\n${JSON.stringify(archive, null, 2)}` : '\nCon
       }),
     });
     await fetchRemoteJob(job);
-    renderJobDetail();
+    renderJobs();
   }
 
   async function disconnectWallet() {
@@ -2204,12 +2227,11 @@ ${Object.keys(archive).length ? `\n${JSON.stringify(archive, null, 2)}` : '\nCon
     renderQuotePanel();
     renderPurchaseQuote();
     renderJobs();
-    renderJobDetail();
     renderTokenBalances();
     persistState();
   }
 
   init().catch((error) => {
-    els.jobDetail.textContent = `UI failed to initialize: ${error.message}`;
+    document.body.textContent = `UI failed to initialize: ${error.message}`;
   });
 }());
