@@ -2030,6 +2030,33 @@ ${Object.keys(archive).length ? `\n${JSON.stringify(archive, null, 2)}` : '\nCon
     els.jobsList.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
   }
 
+  // Guards the entire submitPaidJob() call chain -- including its nested
+  // autoFundAndCreateVideo() -> submitPaidJob(true) retry after a wallet
+  // top-up -- behind a single in-flight lock. Without this, a second click
+  // before the button visibly disabled (or before the first request
+  // resolved) could fire a second submission built from whatever mode/text
+  // was on screen *by then*, which might not match what the user had
+  // configured when they clicked the first time -- e.g. clicking once while
+  // still on Transcript, then switching to Video Card and clicking again,
+  // produces two real jobs, and whichever happens to finish last is the one
+  // that ends up selected/on top.
+  let creatingVideo = false;
+
+  async function handleCreateVideoClick() {
+    if (creatingVideo) return;
+    creatingVideo = true;
+    els.submitJob.disabled = true;
+    const originalLabel = els.submitJob.textContent;
+    els.submitJob.textContent = 'Creating…';
+    try {
+      await submitPaidJob();
+    } finally {
+      creatingVideo = false;
+      els.submitJob.disabled = false;
+      els.submitJob.textContent = originalLabel;
+    }
+  }
+
   function createLocalSampleJob() {
     if (state.freeSampleAttemptsUsed >= 3) {
       els.quoteStatus.textContent = 'Free sample attempts used up';
@@ -2204,7 +2231,7 @@ ${Object.keys(archive).length ? `\n${JSON.stringify(archive, null, 2)}` : '\nCon
     els.registerPurchase.addEventListener('click', registerPurchase);
     els.refreshBalance.addEventListener('click', refreshBalance);
     els.redeemPromoCode.addEventListener('click', redeemPromoCode);
-    els.submitJob.addEventListener('click', () => submitPaidJob());
+    els.submitJob.addEventListener('click', () => handleCreateVideoClick());
     els.tryFreeRender.addEventListener('click', createLocalSampleJob);
     els.paymentsInfo.addEventListener('click', () => els.paymentsInfoDialog.showModal());
     els.dialogClose.addEventListener('click', () => els.paymentsInfoDialog.close());
