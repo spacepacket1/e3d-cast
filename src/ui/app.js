@@ -12,6 +12,29 @@
     { id: 'card', label: 'Video Card', copy: 'Birthday, congratulations, or any occasion — AI writes it and can email a link.' },
     { id: 'audio', label: 'Audio', copy: 'Upload a file or paste a source URL, then create a video.' },
   ];
+
+  // Per-mode title/description/tags and Basic-mode preset. Applied whenever
+  // the active mode changes (and, for Basic mode's preset, on every render)
+  // so a job created from AI Prompt or Video Card doesn't inherit stale
+  // "transcript" wording/format left over from whichever mode was active
+  // before -- Basic mode hides the Title field entirely, so most users never
+  // see or correct it themselves.
+  const MODE_DEFAULTS = {
+    prompt: { title: 'Cast AI prompt video', description: 'AI-written script from a one-line topic, rendered into video.', tags: 'cast,e3d,ai-prompt', preset: 'transcript_short' },
+    transcript: { title: 'Cast transcript short', description: 'Preview subtitle style, watermark state, metadata, and pricing before spend.', tags: 'cast,e3d,transcript', preset: 'transcript_video' },
+    card: { title: 'Cast video card', description: 'AI-written occasion video card, optionally emailed to the recipient.', tags: 'cast,e3d,video-card', preset: 'transcript_short' },
+    audio: { title: 'Cast audio video', description: 'Audio-driven render with diarization, captions, and metadata.', tags: 'cast,e3d,audio', preset: 'youtube' },
+  };
+
+  function modeLabel(id) {
+    const mode = modes.find((entry) => entry.id === id);
+    return mode ? mode.label : (id || 'n/a');
+  }
+
+  function presetLabel(id) {
+    const preset = presets.find((entry) => entry.id === id);
+    return preset ? preset.title : (id || 'n/a');
+  }
   const presets = [
     { id: 'short', title: 'Short', aspect: '9:16', copy: 'Mobile-first clips with captions and watermark-aware defaults.' },
     { id: 'youtube', title: 'YouTube video', aspect: '16:9', copy: 'Longer-form widescreen package with metadata and thumbnail.' },
@@ -88,7 +111,6 @@
   // user isn't asked to make five decisions before creating anything.
   // Advanced mode reveals all of them, unchanged from before.
   const BASIC_MODE_DEFAULTS = {
-    preset: 'youtube',
     subtitleStyle: 'clean_podcast',
     brandEndCard: true,
     madeWithCast: true,
@@ -183,9 +205,10 @@
       cardOccasion: 'birthday',
       recipientEmail: '',
       selectedSampleId: samples[0].id,
-      title: 'Cast transcript short',
-      description: 'Preview subtitle style, watermark state, metadata, and pricing before spend.',
-      tags: 'cast,e3d,transcript',
+      // Matches the default mode ('prompt') above -- see MODE_DEFAULTS.
+      title: MODE_DEFAULTS.prompt.title,
+      description: MODE_DEFAULTS.prompt.description,
+      tags: MODE_DEFAULTS.prompt.tags,
       archiveToIpfs: false,
       brandEndCard: true,
       madeWithCast: true,
@@ -482,7 +505,13 @@
 
   function applyWorkspaceModeDefaults() {
     if (state.workspaceMode !== 'basic') return;
-    Object.assign(state, BASIC_MODE_DEFAULTS);
+    // Preset comes from MODE_DEFAULTS[state.mode], not a single hardcoded
+    // value -- a fixed "always youtube" default (the old behavior) forced
+    // every Basic-mode job, including a one-line AI Prompt or a short Video
+    // Card, into a 16:9/10-minute-shaped preset regardless of which mode
+    // tab was actually selected.
+    const modeDefaults = MODE_DEFAULTS[state.mode] || MODE_DEFAULTS.transcript;
+    Object.assign(state, BASIC_MODE_DEFAULTS, { preset: modeDefaults.preset });
   }
 
   function renderWorkspaceMode() {
@@ -492,7 +521,7 @@
     });
     els.advancedOptions.hidden = state.workspaceMode === 'basic';
     els.workspaceModeCopy.textContent = state.workspaceMode === 'basic'
-      ? 'Basic assumes YouTube preset, clean podcast captions, end card and Made with Cast rebate on, no IPFS archive. Switch to Advanced to change any of that.'
+      ? 'Basic assumes a preset that fits the selected mode, clean podcast captions, end card and Made with Cast rebate on, no IPFS archive. Switch to Advanced to change any of that.'
       : 'Advanced shows every option: output preset, caption style, brand kit, and platform metadata.';
   }
 
@@ -505,8 +534,21 @@
     `).join('');
     els.inputModeTabs.querySelectorAll('[data-mode]').forEach((button) => {
       button.addEventListener('click', () => {
+        const previousDefaults = MODE_DEFAULTS[state.mode];
         state.mode = button.dataset.mode;
         state.preset = defaultPresetForMode(state.mode, state.preset);
+        // Swap title/description/tags to the new mode's defaults, but only
+        // if they still match the previous mode's defaults untouched --
+        // Basic mode hides the Title field entirely, so without this a job
+        // created from AI Prompt or Video Card would silently keep whatever
+        // mode was active first (e.g. "Cast transcript short") forever.
+        // A value the user actually typed themselves is never overwritten.
+        const newDefaults = MODE_DEFAULTS[state.mode];
+        if (previousDefaults && newDefaults) {
+          if (state.title === previousDefaults.title) state.title = newDefaults.title;
+          if (state.description === previousDefaults.description) state.description = newDefaults.description;
+          if (state.tags === previousDefaults.tags) state.tags = newDefaults.tags;
+        }
         // A quote from one mode has a different shape than another's (e.g.
         // prompt-to-podcast quotes have no .limits) -- carrying it across a
         // mode switch would make renderQuotePanel() render garbage or throw.
@@ -1010,7 +1052,7 @@
       return `
       <button class="job-row ${job.jobId === state.selectedJobId ? 'active' : ''}" data-job="${job.jobId}">
         <strong>${job.title || job.jobId}</strong>
-        <span class="small">${status}${isActive ? ` — ${jobProgressLabel(job)}` : ''} • ${job.tier || 'free'} • ${job.source || job.inputKind}</span>
+        <span class="small">${status}${isActive ? ` — ${jobProgressLabel(job)}` : ''} • ${job.tier || 'free'} • ${modeLabel(job.source || job.inputKind)}</span>
       </button>
     `;
     }).join('');
@@ -1214,8 +1256,9 @@
     els.jobDetail.innerHTML = `
       <div class="info-stack">
         <strong>${job.title || job.jobId}</strong>
+        <span>Mode: ${modeLabel(job.inputKind || detail.inputKind)}</span>
         <span>Status: ${detail.status}${!TERMINAL_JOB_STATUSES.has(detail.status) && job.kind !== 'local-sample' ? ` — ${jobProgressLabel(job)} (auto-refreshing every few seconds)` : ''}</span>
-        <span>Preset: ${detail.outputPreset || job.preset || state.preset}</span>
+        <span>Format: ${presetLabel(detail.outputPreset || job.preset || state.preset)}</span>
         <span>Holder discount: ${detail.holderDiscountApplied ? 'applied' : 'not applied'}</span>
         <span>Artifact retention: ${detail.artifactExpiresAt || 'local sample'}</span>
       </div>
