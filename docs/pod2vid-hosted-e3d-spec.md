@@ -3,7 +3,7 @@
 **Project:** e3d-pod2vid  
 **Feature:** Hosted `cast.e3d.ai` product, E3D-paid API endpoints, wallet UI, and agent automation  
 **Target repos:** `/home/ubuntu/e3d-pod2vid`, `/home/ubuntu/e3d-cast`, `/home/ubuntu/spacepacket/server`, `/home/ubuntu/e3d-agent`  
-**Status:** Draft for discussion  
+**Status:** Live at `cast.e3d.ai` (Phases 1–6 shipped). The product has since evolved past the original tab layout and API surface described below — see [§1.11](#111-post-v1-product-evolution-live) for what's actually live today.  
 **Priority:** High  
 **Implementation mode:** Phased, suitable for codex-spec-runner  
 
@@ -184,6 +184,36 @@ This path is resolved before Phase 3 begins, not after. It is part of Phase 2 ac
 ### 1.10 The One Metric
 
 **E3D Token volume consumed by Cast jobs per week.** Everything — tier design, pricing, free trial, agent examples, social publishing — serves this number. Render count and registered wallets are supporting indicators.
+
+### 1.11 Post-v1 Product Evolution (Live)
+
+Everything in sections 2–15 below describes the product as originally scoped for Phases 1–6 and is kept as the historical implementation record. The live product at `cast.e3d.ai` has since diverged from parts of that record. This section is the current source of truth where the two disagree.
+
+**Workspace tabs (`e3d-cast/src/ui/app.js`, `index.html`).** The original four input tabs (Upload / Source URL / Transcript / Sample — §8.1) have been reorganized into:
+
+- **AI Prompt** — type a one-sentence topic; AI writes the full Host/Guest script and the job renders from it.
+- **Transcript** — unchanged: paste/write a transcript directly.
+- **Video Card** — an occasion (birthday, congratulations, or custom), a short description, and an optional recipient email. AI writes a two-voice greeting script; after the render completes the sender can preview it and then send it (see below).
+- **Audio** — merges the old Upload and Source URL tabs into one tab with an Upload/URL toggle.
+
+**Sample** is no longer a standalone tab. The "Try free render" primary action runs the sample job directly (`createLocalSampleJob()`) instead of switching into a Sample tab first.
+
+**New endpoints not in §7.2** (implemented in `spacepacket/server/pod2vidRoutes.js`, proxied the same way as the rest of `/api/cast/*`):
+
+```http
+POST /api/cast/prompt-to-podcast/quote   # estimate credits for a topic or card, no spend
+POST /api/cast/prompt-to-podcast         # write the script (topic or card) and render it, in one call
+POST /api/cast/transcript/improve/quote  # estimate credits for an AI rewrite
+POST /api/cast/transcript/improve        # rewrite transcript or topic text with AI ("Make it better with AI")
+POST /api/cast/promo/redeem              # redeem a promo code for Cast credits, no wallet/purchase required
+POST /api/cast/jobs/:jobId/send-card     # email a completed Video Card's watch link to its recipient
+```
+
+`prompt-to-podcast` and the Video Card flow do **not** use `input.kind` (§7.2) — they're a separate top-level submission path that generates the script server-side before rendering, so they were never a `SUPPORTED_INPUTS` value and don't belong in the `inputs` array in §7.4.
+
+`GET /api/cast/capabilities`, `/openapi/e3d-cast.yaml`, and `/llms.txt` did not mention any of the above until this doc pass — they've now been updated (`spacepacket/server/pod2vidRoutes.js`) to add `promptToPodcast`, `transcriptImprove`, and `promoCodes` fields to the capabilities response and to list the new paths in the OpenAPI doc and `llms.txt`.
+
+**Other shipped UI additions not covered above:** a copy-to-clipboard button next to the credit key, and inline `<video>` playback (instead of a forced download) for `video/mp4` artifacts in the Job Detail panel.
 
 ---
 
@@ -818,6 +848,17 @@ POST /api/cast/jobs/:jobId/archive-ipfs
 POST /api/cast/jobs/:jobId/mint-nft
 ```
 
+Shipped after v1 launch, not in the original phase scope (see [§1.11](#111-post-v1-product-evolution-live)):
+
+```http
+POST /api/cast/prompt-to-podcast/quote
+POST /api/cast/prompt-to-podcast
+POST /api/cast/transcript/improve/quote
+POST /api/cast/transcript/improve
+POST /api/cast/promo/redeem
+POST /api/cast/jobs/:jobId/send-card
+```
+
 `POST /api/cast/jobs/quote` returns an estimated credit cost without spending credits.
 
 `POST /api/cast/jobs` requires:
@@ -1052,9 +1093,28 @@ Minimum response fields:
     "localRequired": true,
     "ipfsArchiveOptional": true,
     "nftMintOptional": true
+  },
+  "promptToPodcast": {
+    "supported": true,
+    "quotePath": "/api/cast/prompt-to-podcast/quote",
+    "submitPath": "/api/cast/prompt-to-podcast",
+    "cardOccasions": ["birthday", "congratulations", "custom"],
+    "cardEmailDelivery": { "supported": true, "sendPath": "/api/cast/jobs/{jobId}/send-card" }
+  },
+  "transcriptImprove": {
+    "supported": true,
+    "quotePath": "/api/cast/transcript/improve/quote",
+    "submitPath": "/api/cast/transcript/improve",
+    "estimatedCredits": 10
+  },
+  "promoCodes": {
+    "supported": true,
+    "redeemPath": "/api/cast/promo/redeem"
   }
 }
 ```
+
+(`promptToPodcast`, `transcriptImprove`, and `promoCodes` were added post-launch — see [§1.11](#111-post-v1-product-evolution-live).)
 
 ---
 
@@ -1078,7 +1138,7 @@ Required views:
 The first viewport should include:
 
 - a compact header with product name, wallet state, credit balance, tier, and E3D holder discount badge if applicable;
-- a central creation panel with input mode tabs:
+- a central creation panel with input mode tabs (as shipped, superseding the list below — see [§1.11](#111-post-v1-product-evolution-live)): AI Prompt, Transcript, Video Card, Audio (with an Upload/URL toggle):
   - Upload;
   - Source URL;
   - Transcript;

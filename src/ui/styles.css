@@ -444,6 +444,26 @@ h2 {
   font-family: var(--mono);
 }
 
+.credit-key-row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+
+.icon-button {
+  border: none;
+  background: transparent;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+  padding: 2px 4px;
+  border-radius: 6px;
+}
+
+.icon-button:hover {
+  background: var(--accent-soft);
+}
+
 .sample-card,
 .artifact-card,
 .code-card {
@@ -732,6 +752,25 @@ dialog::backdrop {
 }
 
 .wallet-row .button {
+  margin-top: 0;
+}
+
+.promo-code-row {
+  margin-top: 10px;
+}
+
+.promo-code-input-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 4px;
+}
+
+.promo-code-input-row .text-input {
+  flex: 1;
+}
+
+.promo-code-input-row .button {
   margin-top: 0;
 }
 

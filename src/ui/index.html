@@ -73,7 +73,10 @@
         <article class="status-card">
           <span class="label">Credits</span>
           <strong id="credit-balance">No credit key</strong>
-          <span id="credit-key-label" class="mono small">Balance unavailable</span>
+          <span class="credit-key-row">
+            <span id="credit-key-label" class="mono small">Balance unavailable</span>
+            <button id="copy-credit-key" class="icon-button" type="button" title="Copy credit key" hidden>📋</button>
+          </span>
         </article>
         <article class="status-card">
           <span class="label">Tier</span>
@@ -168,6 +171,15 @@
               <p class="small">Buy credits with Stripe — no wallet required. Credits unlock Create Video immediately after checkout.</p>
               <div id="stripe-packs" class="stripe-packs"></div>
               <div id="stripe-status" class="info-stack"></div>
+
+              <div class="promo-code-row">
+                <label for="promo-code-input" class="field-label">Have a promo code?</label>
+                <div class="promo-code-input-row">
+                  <input id="promo-code-input" class="text-input mono" type="text" placeholder="CAST-XXXX-XXXX">
+                  <button id="redeem-promo-code" class="button secondary" type="button">Redeem</button>
+                </div>
+                <div id="promo-code-status" class="small"></div>
+              </div>
 
               <details class="crypto-payments">
                 <summary>Pay with E3D / wE3D (advanced)</summary>

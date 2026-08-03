@@ -7,10 +7,10 @@
   const ETH_RPC = 'https://cloudflare-eth.com';
   const BASE_RPC = 'https://mainnet.base.org';
   const modes = [
-    { id: 'upload', label: 'Upload', copy: 'Choose a local media file and register it with the service upload helper.' },
-    { id: 'url', label: 'Source URL', copy: 'Quote and dispatch a hosted fetch from a public media URL.' },
+    { id: 'prompt', label: 'AI Prompt', copy: 'Type one sentence — AI writes the script and renders the video.' },
     { id: 'transcript', label: 'Transcript', copy: 'Paste transcript text, preview the tier fit, and create a video.' },
-    { id: 'sample', label: 'Sample', copy: 'Run a free public sample render before buying credits.' },
+    { id: 'card', label: 'Video Card', copy: 'Birthday, congratulations, or any occasion — AI writes it and can email a link.' },
+    { id: 'audio', label: 'Audio', copy: 'Upload a file or paste a source URL, then create a video.' },
   ];
   const presets = [
     { id: 'short', title: 'Short', aspect: '9:16', copy: 'Mobile-first clips with captions and watermark-aware defaults.' },
@@ -102,6 +102,7 @@
     holderBadge: document.querySelector('#holder-badge'),
     creditBalance: document.querySelector('#credit-balance'),
     creditKeyLabel: document.querySelector('#credit-key-label'),
+    copyCreditKey: document.querySelector('#copy-credit-key'),
     activeTier: document.querySelector('#active-tier'),
     freeAttempts: document.querySelector('#free-attempts'),
     workspaceModeToggle: document.querySelector('#workspace-mode-toggle'),
@@ -132,6 +133,9 @@
     paymentMethod: document.querySelector('#payment-method'),
     registerPurchase: document.querySelector('#register-purchase'),
     refreshBalance: document.querySelector('#refresh-balance'),
+    promoCodeInput: document.querySelector('#promo-code-input'),
+    redeemPromoCode: document.querySelector('#redeem-promo-code'),
+    promoCodeStatus: document.querySelector('#promo-code-status'),
     stripePacks: document.querySelector('#stripe-packs'),
     stripeStatus: document.querySelector('#stripe-status'),
     buyCreditsCta: document.querySelector('#buy-credits-cta'),
@@ -161,7 +165,7 @@
       creditBalance: null,
       creditBalanceError: false,
       holderDiscountApplied: false,
-      mode: 'transcript',
+      mode: 'prompt',
       preset: 'transcript_short',
       subtitleStyle: 'bold_mobile',
       transcriptText: 'Title: Time Tunnel\nHost: Welcome Time Traveller. Tell us your story.\nGuest: There I was, speeding through a wormhole, tumbling, and turning along the way.\nHost: It must have been scary. How long did it last?\nGuest: It felt like an eternity, but it really only lasted for a couple of seconds.\nHost: Do you remember any details?',
@@ -171,8 +175,13 @@
       uploadError: '',
       uploadProgress: 0,
       transcriptionEngine: 'assemblyai',
+      audioSource: 'upload',
       hostVoiceGender: 'male',
       guestVoiceGender: 'female',
+      promptTopic: 'Interview a time traveller about wormhole physics',
+      cardTopic: 'Jamie is turning 30 and loves hiking, board games, and terrible puns.',
+      cardOccasion: 'birthday',
+      recipientEmail: '',
       selectedSampleId: samples[0].id,
       title: 'Cast transcript short',
       description: 'Preview subtitle style, watermark state, metadata, and pricing before spend.',
@@ -211,8 +220,13 @@
       transcriptText: state.transcriptText,
       sourceUrl: state.sourceUrl,
       transcriptionEngine: state.transcriptionEngine,
+      audioSource: state.audioSource,
       hostVoiceGender: state.hostVoiceGender,
       guestVoiceGender: state.guestVoiceGender,
+      promptTopic: state.promptTopic,
+      cardTopic: state.cardTopic,
+      cardOccasion: state.cardOccasion,
+      recipientEmail: state.recipientEmail,
       selectedSampleId: state.selectedSampleId,
       title: state.title,
       description: state.description,
@@ -274,17 +288,17 @@
   }
 
   function currentInput() {
-    if (state.mode === 'upload') {
+    if (state.mode === 'audio' && state.audioSource === 'upload') {
       return state.upload
         ? { kind: 'upload', uploadId: state.upload.uploadId, sizeBytes: state.upload.sizeBytes }
         : { kind: 'upload', uploadId: '', sizeBytes: 0 };
     }
-    if (state.mode === 'url') {
+    if (state.mode === 'audio' && state.audioSource === 'url') {
       return { kind: 'url', url: state.sourceUrl };
     }
-    if (state.mode === 'sample') {
-      return { kind: 'transcript', text: `${selectedSample().title}\n${selectedSample().description}` };
-    }
+    // Prompt mode's "topic" sub-path never reaches this function (it's routed
+    // through quotePromptJob()/submitPromptJob() instead) -- this is only
+    // ever hit for prompt mode's "I'll write my own script" sub-path.
     return { kind: 'transcript', text: state.transcriptText };
   }
 
@@ -292,11 +306,14 @@
     return {
       dryRun: false,
       subtitleStyle: state.subtitleStyle,
-      transcriptionEngine: state.mode === 'upload' || state.mode === 'url' ? state.transcriptionEngine : 'assemblyai',
+      transcriptionEngine: state.mode === 'audio' ? state.transcriptionEngine : 'assemblyai',
       brandEndCard: state.brandEndCard,
       archiveToIpfs: state.archiveToIpfs,
       transcriptText: state.transcriptText,
-      voices: { host: state.hostVoiceGender, guest: state.guestVoiceGender },
+      // Video Card mode has no voice pickers -- let the renderer fall back to
+      // its own distinct Host/Guest defaults instead of sending stale values
+      // left over from another mode.
+      voices: state.mode === 'card' ? undefined : { host: state.hostVoiceGender, guest: state.guestVoiceGender },
       title: state.title,
       description: state.description,
       tags: state.tags.split(',').map((value) => value.trim()).filter(Boolean),
@@ -463,12 +480,8 @@
     els.tokenBalances.innerHTML = `E3D&nbsp;<strong>${fmt(tb.e3d)}</strong>&ensp;·&ensp;Base wE3D&nbsp;<strong>${fmt(tb.we3d)}</strong>`;
   }
 
-  // Sample mode already assigns preset/subtitleStyle per selected sample
-  // (see the sample gallery click handler in renderInputPanel) -- basic
-  // mode must not fight that assignment, so it only forces its own
-  // defaults for the real creation flows (upload/url/transcript).
   function applyWorkspaceModeDefaults() {
-    if (state.workspaceMode !== 'basic' || state.mode === 'sample') return;
+    if (state.workspaceMode !== 'basic') return;
     Object.assign(state, BASIC_MODE_DEFAULTS);
   }
 
@@ -494,6 +507,10 @@
       button.addEventListener('click', () => {
         state.mode = button.dataset.mode;
         state.preset = defaultPresetForMode(state.mode, state.preset);
+        // A quote from one mode has a different shape than another's (e.g.
+        // prompt-to-podcast quotes have no .limits) -- carrying it across a
+        // mode switch would make renderQuotePanel() render garbage or throw.
+        state.quote = null;
         persistState();
         render();
       });
@@ -504,10 +521,10 @@
   const TEXT_DRIVEN_PRESET = { youtube: 'transcript_video', short: 'transcript_short' };
 
   function defaultPresetForMode(mode, currentPreset) {
-    if ((mode === 'upload' || mode === 'url') && AUDIO_DRIVEN_PRESET[currentPreset]) {
+    if (mode === 'audio' && AUDIO_DRIVEN_PRESET[currentPreset]) {
       return AUDIO_DRIVEN_PRESET[currentPreset];
     }
-    if ((mode === 'transcript' || mode === 'sample') && TEXT_DRIVEN_PRESET[currentPreset]) {
+    if ((mode === 'prompt' || mode === 'transcript' || mode === 'card') && TEXT_DRIVEN_PRESET[currentPreset]) {
       return TEXT_DRIVEN_PRESET[currentPreset];
     }
     return currentPreset;
@@ -538,109 +555,11 @@
     });
   }
 
-  function renderInputPanel() {
-    if (state.mode === 'upload') {
-      const statusText = state.uploadError
-        ? `Upload failed: ${state.uploadError}`
-        : state.upload
-          ? `Registered ${state.upload.fileName} (${formatBytes(state.upload.sizeBytes)}) as ${state.upload.uploadId}`
-          : 'No upload registered yet. Supports m4a, mp3, wav, and mp4 — submitting a paid job runs real diarization + transcription and returns a captions/transcript artifact.';
-      els.inputModePanel.innerHTML = `
-        <input id="upload-file" class="text-input" type="file" accept="audio/*,video/*,.m4a,.mp3,.wav,.mp4" ${state.uploadBusy ? 'disabled' : ''}>
-        <div class="upload-actions">
-          <button id="upload-file-button" class="button secondary" ${state.uploadBusy ? 'disabled' : ''}>${state.uploadBusy ? 'Uploading…' : 'Register upload'}</button>
-          ${state.uploadBusy ? `
-            <div class="upload-progress-wrap">
-              <progress id="upload-progress" value="${state.uploadProgress || 0}" max="100"></progress>
-              <span id="upload-progress-text" class="small">${state.uploadProgress || 0}%</span>
-            </div>
-          ` : ''}
-        </div>
-        <div class="small">${statusText}</div>
-        ${transcriptionEngineBlock()}
-      `;
-      wireTranscriptionEngineBlock();
-      document.querySelector('#upload-file-button').addEventListener('click', async () => {
-        const fileInput = document.querySelector('#upload-file');
-        const file = fileInput.files && fileInput.files[0];
-        if (!file) return;
-        state.uploadBusy = true;
-        state.uploadError = '';
-        state.uploadProgress = 0;
-        renderInputPanel();
-        try {
-          const base64 = await fileToBase64(file);
-          const payload = JSON.stringify({
-            fileName: file.name,
-            contentType: file.type,
-            dataBase64: base64,
-          });
-          state.upload = await uploadWithProgress('/ui-api/uploads', payload, (percent) => {
-            state.uploadProgress = percent;
-            const bar = document.querySelector('#upload-progress');
-            const label = document.querySelector('#upload-progress-text');
-            if (bar) bar.value = percent;
-            if (label) label.textContent = `${percent}%`;
-          });
-        } catch (error) {
-          state.upload = null;
-          state.uploadError = error.message || 'Upload failed';
-        } finally {
-          state.uploadBusy = false;
-          persistState();
-          render();
-        }
-      });
-      return;
-    }
-
-    if (state.mode === 'url') {
-      els.inputModePanel.innerHTML = `
-        <input id="source-url-input" class="text-input" type="url" placeholder="https://example.com/podcast.mp3" value="${state.sourceUrl}">
-        <div class="small">Public HTTP(S) source only. The worker downloads this URL at dispatch time.</div>
-        ${transcriptionEngineBlock()}
-      `;
-      wireTranscriptionEngineBlock();
-      document.querySelector('#source-url-input').addEventListener('input', (event) => {
-        state.sourceUrl = event.target.value;
-        persistState();
-      });
-      return;
-    }
-
-    if (state.mode === 'sample') {
-      els.inputModePanel.innerHTML = `
-        <div class="sample-gallery">
-          ${samples.map((sample) => `
-            <article class="sample-card">
-              <img src="${samplePoster(sample)}" alt="${sample.title}">
-              <strong>${sample.title}</strong>
-              <p>${sample.description}</p>
-              <button class="button ${sample.id === state.selectedSampleId ? 'primary' : 'ghost'}" data-sample="${sample.id}">
-                ${sample.id === state.selectedSampleId ? 'Selected' : 'Use sample'}
-              </button>
-            </article>
-          `).join('')}
-        </div>
-      `;
-      els.inputModePanel.querySelectorAll('[data-sample]').forEach((button) => {
-        button.addEventListener('click', () => {
-          state.selectedSampleId = button.dataset.sample;
-          state.title = selectedSample().title;
-          state.description = selectedSample().description;
-          state.preset = selectedSample().preset;
-          state.subtitleStyle = selectedSample().style;
-          persistState();
-          render();
-        });
-      });
-      return;
-    }
-
-    const maxChars = state.capabilities ? (state.capabilities.tiers.find((tier) => tier.id === currentTier()) || state.capabilities.tiers[1]).maxTranscriptChars : 20000;
-    els.inputModePanel.innerHTML = `
-      <textarea id="transcript-input" class="text-area" placeholder="Title: ... (optional)&#10;Host: ...&#10;Guest: ...">${state.transcriptText}</textarea>
-      <div id="transcript-length" class="small">Transcript length: ${state.transcriptText.length} / ${maxChars} characters for ${currentTier()} tier.</div>
+  // Shared by AI Prompt and Transcript modes -- Video Card mode deliberately
+  // has no voice pickers (see currentOptions()) since a card's two voices
+  // are just whoever's "wishing you well," not a named Host/Guest pairing.
+  function voicePickerRowHtml() {
+    return `
       <div class="voice-picker-row">
         <label class="small">Host voice
           <select id="host-voice-gender">
@@ -655,20 +574,10 @@
           </select>
         </label>
       </div>
-      <div class="improve-transcript-row">
-        <button id="improve-transcript-btn" class="button ghost" type="button">Make it better with AI</button>
-        <span id="improve-transcript-status" class="small"></span>
-      </div>
-      <div id="improve-transcript-panel"></div>
     `;
-    document.querySelector('#transcript-input').addEventListener('input', (event) => {
-      state.transcriptText = event.target.value;
-      persistState();
-      // Rewriting innerHTML (as a full renderInputPanel() would) replaces the
-      // textarea node on every keystroke and drops focus -- only the counter
-      // text needs to change here.
-      document.querySelector('#transcript-length').textContent = `Transcript length: ${state.transcriptText.length} / ${maxChars} characters for ${currentTier()} tier.`;
-    });
+  }
+
+  function wireVoicePickerRow() {
     document.querySelector('#host-voice-gender').addEventListener('change', (event) => {
       state.hostVoiceGender = event.target.value;
       persistState();
@@ -677,8 +586,167 @@
       state.guestVoiceGender = event.target.value;
       persistState();
     });
-    document.querySelector('#improve-transcript-btn').addEventListener('click', quoteImproveTranscript);
-    renderImproveTranscriptPanel();
+  }
+
+  function renderInputPanel() {
+    if (state.mode === 'prompt') {
+      els.inputModePanel.innerHTML = `
+        <textarea id="prompt-topic-input" class="text-area compact" maxlength="500" placeholder="e.g. Interview a time traveller about wormhole physics">${state.promptTopic}</textarea>
+        ${voicePickerRowHtml()}
+        <div class="improve-transcript-row">
+          <button id="improve-transcript-btn" class="button ghost" type="button">Make it better with AI</button>
+          <span id="improve-transcript-status" class="small"></span>
+        </div>
+        <div id="improve-transcript-panel"></div>
+      `;
+      document.querySelector('#prompt-topic-input').addEventListener('input', (event) => {
+        state.promptTopic = event.target.value;
+        persistState();
+      });
+      wireVoicePickerRow();
+      document.querySelector('#improve-transcript-btn').addEventListener('click', quoteImproveTranscript);
+      renderImproveTranscriptPanel();
+      return;
+    }
+    if (state.mode === 'transcript') {
+      const maxChars = state.capabilities ? (state.capabilities.tiers.find((tier) => tier.id === currentTier()) || state.capabilities.tiers[1]).maxTranscriptChars : 20000;
+      els.inputModePanel.innerHTML = `
+        <textarea id="transcript-input" class="text-area" placeholder="Title: ... (optional)&#10;Host: ...&#10;Guest: ...">${state.transcriptText}</textarea>
+        <div id="transcript-length" class="small">Transcript length: ${state.transcriptText.length} / ${maxChars} characters for ${currentTier()} tier.</div>
+        ${voicePickerRowHtml()}
+        <div class="improve-transcript-row">
+          <button id="improve-transcript-btn" class="button ghost" type="button">Make it better with AI</button>
+          <span id="improve-transcript-status" class="small"></span>
+        </div>
+        <div id="improve-transcript-panel"></div>
+      `;
+      document.querySelector('#transcript-input').addEventListener('input', (event) => {
+        state.transcriptText = event.target.value;
+        persistState();
+        // Rewriting innerHTML (as a full renderInputPanel() would) replaces
+        // the textarea node on every keystroke and drops focus -- only the
+        // counter text needs to change here.
+        document.querySelector('#transcript-length').textContent = `Transcript length: ${state.transcriptText.length} / ${maxChars} characters for ${currentTier()} tier.`;
+      });
+      wireVoicePickerRow();
+      document.querySelector('#improve-transcript-btn').addEventListener('click', quoteImproveTranscript);
+      renderImproveTranscriptPanel();
+      return;
+    }
+    if (state.mode === 'card') {
+      els.inputModePanel.innerHTML = `
+        <textarea id="card-topic-input" class="text-area compact" maxlength="500" placeholder="e.g. Jamie is turning 30 and loves hiking, board games, and terrible puns">${state.cardTopic}</textarea>
+        <div class="voice-picker-row">
+          <label class="small">Occasion
+            <select id="card-occasion">
+              <option value="birthday" ${state.cardOccasion === 'birthday' ? 'selected' : ''}>Birthday</option>
+              <option value="congratulations" ${state.cardOccasion === 'congratulations' ? 'selected' : ''}>Congratulations</option>
+              <option value="custom" ${state.cardOccasion === 'custom' ? 'selected' : ''}>Custom</option>
+            </select>
+          </label>
+          <label class="small">Email it to (optional)
+            <input type="email" id="card-recipient-email" class="text-input" placeholder="friend@example.com" value="${state.recipientEmail}">
+          </label>
+        </div>
+        <div class="small">Videos are too big to attach to email, so we'll send a link to watch it instead.</div>
+        <div class="improve-transcript-row">
+          <button id="improve-transcript-btn" class="button ghost" type="button">Make it better with AI</button>
+          <span id="improve-transcript-status" class="small"></span>
+        </div>
+        <div id="improve-transcript-panel"></div>
+      `;
+      document.querySelector('#card-topic-input').addEventListener('input', (event) => {
+        state.cardTopic = event.target.value;
+        persistState();
+      });
+      document.querySelector('#card-occasion').addEventListener('change', (event) => {
+        state.cardOccasion = event.target.value;
+        persistState();
+      });
+      document.querySelector('#card-recipient-email').addEventListener('input', (event) => {
+        state.recipientEmail = event.target.value;
+        persistState();
+      });
+      document.querySelector('#improve-transcript-btn').addEventListener('click', quoteImproveTranscript);
+      renderImproveTranscriptPanel();
+      return;
+    }
+    // state.mode === 'audio' is the only remaining case.
+    const uploadStatusText = state.uploadError
+      ? `Upload failed: ${state.uploadError}`
+      : state.upload
+        ? `Registered ${state.upload.fileName} (${formatBytes(state.upload.sizeBytes)}) as ${state.upload.uploadId}`
+        : 'No upload registered yet. Supports m4a, mp3, wav, and mp4 — submitting a paid job runs real diarization + transcription and returns a captions/transcript artifact.';
+    els.inputModePanel.innerHTML = `
+      <div class="toggle-row">
+        <label><input type="radio" name="audio-source" value="upload" ${state.audioSource === 'upload' ? 'checked' : ''}> Upload a file</label>
+        <label><input type="radio" name="audio-source" value="url" ${state.audioSource === 'url' ? 'checked' : ''}> Paste a URL</label>
+      </div>
+      ${state.audioSource === 'url' ? `
+        <input id="source-url-input" class="text-input" type="url" placeholder="https://example.com/podcast.mp3" value="${state.sourceUrl}">
+        <div class="small">Public HTTP(S) source only. The worker downloads this URL at dispatch time.</div>
+      ` : `
+        <input id="upload-file" class="text-input" type="file" accept="audio/*,video/*,.m4a,.mp3,.wav,.mp4" ${state.uploadBusy ? 'disabled' : ''}>
+        <div class="upload-actions">
+          <button id="upload-file-button" class="button secondary" ${state.uploadBusy ? 'disabled' : ''}>${state.uploadBusy ? 'Uploading…' : 'Register upload'}</button>
+          ${state.uploadBusy ? `
+            <div class="upload-progress-wrap">
+              <progress id="upload-progress" value="${state.uploadProgress || 0}" max="100"></progress>
+              <span id="upload-progress-text" class="small">${state.uploadProgress || 0}%</span>
+            </div>
+          ` : ''}
+        </div>
+        <div class="small">${uploadStatusText}</div>
+      `}
+      ${transcriptionEngineBlock()}
+    `;
+    wireTranscriptionEngineBlock();
+    document.querySelectorAll('input[name="audio-source"]').forEach((input) => {
+      input.addEventListener('change', (event) => {
+        state.audioSource = event.target.value;
+        state.quote = null;
+        persistState();
+        renderInputPanel();
+      });
+    });
+    if (state.audioSource === 'url') {
+      document.querySelector('#source-url-input').addEventListener('input', (event) => {
+        state.sourceUrl = event.target.value;
+        persistState();
+      });
+      return;
+    }
+    document.querySelector('#upload-file-button').addEventListener('click', async () => {
+      const fileInput = document.querySelector('#upload-file');
+      const file = fileInput.files && fileInput.files[0];
+      if (!file) return;
+      state.uploadBusy = true;
+      state.uploadError = '';
+      state.uploadProgress = 0;
+      renderInputPanel();
+      try {
+        const base64 = await fileToBase64(file);
+        const payload = JSON.stringify({
+          fileName: file.name,
+          contentType: file.type,
+          dataBase64: base64,
+        });
+        state.upload = await uploadWithProgress('/ui-api/uploads', payload, (percent) => {
+          state.uploadProgress = percent;
+          const bar = document.querySelector('#upload-progress');
+          const label = document.querySelector('#upload-progress-text');
+          if (bar) bar.value = percent;
+          if (label) label.textContent = `${percent}%`;
+        });
+      } catch (error) {
+        state.upload = null;
+        state.uploadError = error.message || 'Upload failed';
+      } finally {
+        state.uploadBusy = false;
+        persistState();
+        render();
+      }
+    });
   }
 
   function renderImproveTranscriptPanel() {
@@ -704,11 +772,20 @@
     });
   }
 
+  // Transcript mode improves the full script; AI Prompt and Video Card mode
+  // improve their topic field instead -- same button, same endpoint, just a
+  // different state field depending on which mode is showing it.
+  function improveTargetKey() {
+    if (state.mode === 'card') return 'cardTopic';
+    if (state.mode === 'prompt') return 'promptTopic';
+    return 'transcriptText';
+  }
+
   async function quoteImproveTranscript() {
-    const text = state.transcriptText.trim();
+    const text = state[improveTargetKey()].trim();
     const statusEl = document.querySelector('#improve-transcript-status');
     if (!text) {
-      if (statusEl) statusEl.textContent = 'Add some transcript text first';
+      if (statusEl) statusEl.textContent = 'Add some text first';
       return;
     }
     if (statusEl) statusEl.textContent = 'Quoting…';
@@ -733,6 +810,7 @@
       return;
     }
     if (statusEl) statusEl.textContent = 'Improving with AI…';
+    const key = improveTargetKey();
     try {
       const result = await apiJson('/api/cast/transcript/improve', {
         method: 'POST',
@@ -741,9 +819,9 @@
           'idempotency-key': `ui-improve-${Date.now()}`,
           'content-type': 'application/json',
         },
-        body: JSON.stringify({ text: state.transcriptText.trim() }),
+        body: JSON.stringify({ text: state[key].trim() }),
       });
-      state.transcriptText = result.improvedText;
+      state[key] = result.improvedText;
       state.improveQuote = null;
       persistState();
       renderInputPanel();
@@ -754,6 +832,22 @@
       if (statusEl) statusEl.textContent = (error.payload && error.payload.error) || error.message;
       renderImproveTranscriptPanel();
     }
+  }
+
+  // Shared by both the quote and submit calls so card fields are always sent
+  // consistently (and never sent at all outside card mode).
+  // Shared by quotePromptJob()/submitPromptJob() -- both AI Prompt and Video
+  // Card mode go through the same prompt-to-podcast endpoints, just with a
+  // different topic field and (for cards) occasion/recipient extras.
+  function promptModeFields() {
+    if (state.mode === 'card') {
+      return {
+        topic: state.cardTopic.trim(),
+        cardOccasion: state.cardOccasion,
+        recipientEmail: state.recipientEmail.trim(),
+      };
+    }
+    return { topic: state.promptTopic.trim() };
   }
 
   function renderPresetGrid() {
@@ -810,7 +904,7 @@
     els.brandEndCard.checked = state.brandEndCard;
     els.madeWithToggle.checked = state.madeWithCast;
     els.archiveToggle.checked = state.archiveToIpfs;
-    const watermarkOn = currentTier() === 'free' || state.mode === 'sample';
+    const watermarkOn = currentTier() === 'free';
     els.watermarkCopy.textContent = watermarkOn
       ? 'Free/sample renders show the Cast watermark and a 24-hour retention window.'
       : 'Paid tiers remove the watermark. End card stays on by default for a small rebate.';
@@ -837,6 +931,7 @@
       ? 'Balance unavailable — tap Refresh'
       : (state.creditBalance == null ? 'No credit key' : `${state.creditBalance} credits`);
     els.creditKeyLabel.textContent = state.creditKey ? `Key ${state.creditKey.slice(0, 14)}...` : 'Add credits to unlock paid submission';
+    if (els.copyCreditKey) els.copyCreditKey.hidden = !state.creditKey;
     els.activeTier.textContent = currentTier();
     els.freeAttempts.textContent = `Free sample attempts remaining: ${attemptsRemaining}`;
     els.submitState.textContent = state.creditKey ? 'Ready to create video' : 'Create Video will prompt a wallet payment for credits';
@@ -848,6 +943,21 @@
         <div class="info-stack">
           <strong>No quote yet</strong>
           <span class="small">Live quotes show estimated credits, limit fit, burn amount, and discount state before spend.</span>
+        </div>
+      `;
+      return;
+    }
+    if (state.mode === 'prompt' || state.mode === 'card') {
+      // prompt-to-podcast quotes are a different, simpler shape (no
+      // duration/artifact/limits estimate -- the script doesn't exist yet)
+      // than a normal job quote, so they get their own small view here.
+      // Transcript/Audio modes use the normal job quote endpoint instead, so
+      // they fall through to the rich view below.
+      els.quotePanel.innerHTML = `
+        <div class="info-stack">
+          <strong>${state.quote.estimatedCredits} credits</strong>
+          <span>${state.quote.generationCredits} to write the ${state.mode === 'card' ? 'card' : 'script'} + ~${state.quote.estimatedRenderCredits} to render</span>
+          <span class="small">${state.quote.note}</span>
         </div>
       `;
       return;
@@ -948,6 +1058,16 @@
     return (job.remoteStatus && job.remoteStatus.status) || job.status;
   }
 
+  // Shared by every job-submission flow (manual quote/submit, prompt-to-podcast,
+  // ...) so a freshly created job always lands in Recent Jobs and gets selected
+  // the same way regardless of which flow created it.
+  function trackNewJob(job) {
+    state.jobs.unshift(job);
+    state.selectedJobId = job.jobId;
+    persistState();
+    return job;
+  }
+
   // The worker reports coarse phases (e.g. "transcribe", "render") via
   // job.progress events; fall back to a generic message until the first one
   // lands so the row doesn't look stuck with no text at all.
@@ -1043,10 +1163,42 @@
         preview.textContent = `${artifact.artifactId} (${contentType})\n\n${await blob.text()}`;
         return;
       }
+      // A real job's video is behind an auth-gated download endpoint (unlike
+      // the public sample above), so it has to come through as a blob -- but
+      // it should still play inline, not silently turn "Play video" into a
+      // download.
+      if (contentType === 'video/mp4') {
+        preview.textContent = '';
+        const video = document.createElement('video');
+        video.controls = true;
+        video.style.maxWidth = '100%';
+        video.src = URL.createObjectURL(blob);
+        preview.appendChild(video);
+        return;
+      }
       preview.textContent = `Downloading ${artifact.fileName || artifact.artifactId}…`;
       triggerBlobDownload(blob, artifact.fileName || artifact.artifactId);
     } catch (error) {
       preview.textContent = `Failed to open ${artifact.artifactId}: ${error.message}`;
+    }
+  }
+
+  async function sendCard(job) {
+    const statusEl = document.querySelector('#send-card-status');
+    const button = els.jobDetail.querySelector('[data-send-card]');
+    if (button) button.disabled = true;
+    if (statusEl) statusEl.textContent = 'Sending…';
+    try {
+      await apiJson(`/api/cast/jobs/${job.jobId}/send-card`, {
+        method: 'POST',
+        headers: { authorization: `Bearer ${state.creditKey}`, 'content-type': 'application/json' },
+        body: JSON.stringify({}),
+      });
+      await fetchRemoteJob(job);
+      renderJobDetail();
+    } catch (error) {
+      if (button) button.disabled = false;
+      if (statusEl) statusEl.textContent = `Failed: ${(error.payload && error.payload.error) || error.message}`;
     }
   }
 
@@ -1078,6 +1230,18 @@
         `).join('')}
       </div>
       <div id="artifact-preview" class="manifest-box" hidden></div>
+      ${detail.recipientEmail ? `
+        <div class="manifest-box">
+          ${detail.cardEmailSentAt ? `
+            Card sent to ${detail.recipientEmail} at ${detail.cardEmailSentAt}.
+            ${detail.cardEmailWatchUrl ? `<a href="${detail.cardEmailWatchUrl}" target="_blank" rel="noreferrer">Watch link</a>` : ''}
+          ` : `
+            <button class="button primary" data-send-card type="button" ${detail.status === 'succeeded' ? '' : 'disabled'}>Send card to ${detail.recipientEmail}</button>
+            <div class="small">${detail.status === 'succeeded' ? 'Preview it with "Play video" above first if you like.' : 'Waiting for the video to finish rendering…'}</div>
+          `}
+          <span id="send-card-status" class="small"></span>
+        </div>
+      ` : ''}
       <div class="chip-row">
         <button class="button secondary" data-revision="thumbnail">Revision: thumbnail</button>
         <button class="button secondary" data-revision="metadata">Revision: metadata</button>
@@ -1093,6 +1257,8 @@ ${Object.keys(archive).length ? `\n${JSON.stringify(archive, null, 2)}` : '\nCon
         if (artifact) openArtifact(job, artifact);
       });
     });
+    const sendCardButton = els.jobDetail.querySelector('[data-send-card]');
+    if (sendCardButton) sendCardButton.addEventListener('click', () => sendCard(job));
     els.jobDetail.querySelectorAll('[data-revision]').forEach((button) => {
       button.addEventListener('click', () => runRevision(job, button.dataset.revision));
     });
@@ -1101,20 +1267,28 @@ ${Object.keys(archive).length ? `\n${JSON.stringify(archive, null, 2)}` : '\nCon
   }
 
   function inputReadinessIssue() {
-    if (state.mode === 'upload') {
-      if (state.uploadBusy) return 'Upload still in progress — wait for it to finish before quoting or submitting.';
-      if (!state.upload) return 'Register an upload first.';
+    if (state.mode === 'audio') {
+      if (state.audioSource === 'upload') {
+        if (state.uploadBusy) return 'Upload still in progress — wait for it to finish before quoting or submitting.';
+        if (!state.upload) return 'Register an upload first.';
+      } else if (!state.sourceUrl.trim()) {
+        return 'Enter a source URL first.';
+      }
     }
-    if (state.mode === 'url' && !state.sourceUrl.trim()) {
-      return 'Enter a source URL first.';
+    if (state.mode === 'prompt' && !state.promptTopic.trim()) {
+      return 'Type a topic first.';
     }
     if (state.mode === 'transcript' && !state.transcriptText.trim()) {
       return 'Paste transcript text first.';
+    }
+    if (state.mode === 'card' && !state.cardTopic.trim()) {
+      return 'Describe the card first.';
     }
     return '';
   }
 
   async function quoteJob() {
+    if (state.mode === 'prompt' || state.mode === 'card') return quotePromptJob();
     const issue = inputReadinessIssue();
     if (issue) {
       els.quoteStatus.textContent = 'Quote failed';
@@ -1137,6 +1311,36 @@ ${Object.keys(archive).length ? `\n${JSON.stringify(archive, null, 2)}` : '\nCon
         }),
       });
       state.holderDiscountApplied = !!state.quote.holderDiscountApplied;
+      els.quoteStatus.textContent = 'Quoted';
+      persistState();
+      render();
+    } catch (error) {
+      els.quoteStatus.textContent = 'Quote failed';
+      els.quotePanel.innerHTML = `<div class="manifest-box">${(error.payload && JSON.stringify(error.payload, null, 2)) || error.message}</div>`;
+    }
+    els.quotePanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  async function quotePromptJob() {
+    const issue = inputReadinessIssue();
+    if (issue) {
+      els.quoteStatus.textContent = 'Quote failed';
+      els.quotePanel.innerHTML = `<div class="manifest-box">${issue}</div>`;
+      els.quotePanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      return;
+    }
+    els.quoteStatus.textContent = 'Quoting';
+    try {
+      state.quote = await apiJson('/api/cast/prompt-to-podcast/quote', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({
+          preset: state.preset,
+          tier: currentTier(),
+          options: currentOptions(),
+          ...promptModeFields(),
+        }),
+      });
       els.quoteStatus.textContent = 'Quoted';
       persistState();
       render();
@@ -1382,6 +1586,38 @@ ${Object.keys(archive).length ? `\n${JSON.stringify(archive, null, 2)}` : '\nCon
     renderStatus();
   }
 
+  async function redeemPromoCode() {
+    const code = (els.promoCodeInput.value || '').trim();
+    if (!code) {
+      els.promoCodeStatus.textContent = 'Enter a promo code first';
+      return;
+    }
+    els.promoCodeStatus.textContent = 'Redeeming…';
+    els.redeemPromoCode.disabled = true;
+    try {
+      const result = await apiJson('/api/cast/promo/redeem', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json' },
+        body: JSON.stringify({ code, existingCreditKey: state.creditKey || undefined }),
+      });
+      // A fresh key is only returned when there was no existing key to top
+      // up -- if one was supplied, the credits landed on it already and
+      // state.creditKey is already correct.
+      if (result.creditKey) {
+        state.creditKey = result.creditKey;
+      }
+      persistState();
+      els.promoCodeInput.value = '';
+      await refreshBalance();
+      render();
+      els.promoCodeStatus.textContent = `+${result.credits} credits redeemed!`;
+    } catch (error) {
+      els.promoCodeStatus.textContent = (error.payload && error.payload.error) || error.message;
+    } finally {
+      els.redeemPromoCode.disabled = false;
+    }
+  }
+
   // Mirrors the backend's minimum credit purchase floor (productRegistry.js /
   // x402Config.js MIN_CREDIT_PURCHASE) — not exposed via a public endpoint, so
   // duplicated here deliberately rather than guessed at.
@@ -1594,6 +1830,7 @@ ${Object.keys(archive).length ? `\n${JSON.stringify(archive, null, 2)}` : '\nCon
   }
 
   async function submitPaidJob(isRetryAfterFunding) {
+    if (state.mode === 'prompt' || state.mode === 'card') return submitPromptJob();
     if (!state.creditKey) {
       if (isRetryAfterFunding) {
         els.quoteStatus.textContent = 'Get E3D / buy credits first';
@@ -1632,18 +1869,69 @@ ${Object.keys(archive).length ? `\n${JSON.stringify(archive, null, 2)}` : '\nCon
       els.quotePanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
       return;
     }
-    const job = {
+    const job = trackNewJob({
       jobId: submission.jobId,
       title: state.title,
       status: submission.status,
       tier: submission.tier,
       inputKind: state.mode,
       preset: state.preset,
-    };
-    state.jobs.unshift(job);
-    state.selectedJobId = job.jobId;
-    persistState();
+    });
     await pollJobStatus(job);
+    await refreshBalance();
+    render();
+    els.jobDetail.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  }
+
+  // Card/podcast generation doesn't hook into the wallet auto-fund flow (that
+  // path is tightly coupled to /api/cast/jobs semantics) -- with no credit
+  // key yet, it just points the user at buying credits instead.
+  async function submitPromptJob() {
+    if (!state.creditKey) {
+      els.quoteStatus.textContent = 'Add a credit key or buy credits first';
+      return;
+    }
+    const issue = inputReadinessIssue();
+    if (issue) {
+      els.quoteStatus.textContent = 'Create video failed';
+      els.quotePanel.innerHTML = `<div class="manifest-box">${issue}</div>`;
+      els.quotePanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      return;
+    }
+    let result;
+    try {
+      result = await apiJson('/api/cast/prompt-to-podcast', {
+        method: 'POST',
+        headers: {
+          authorization: `Bearer ${state.creditKey}`,
+          'idempotency-key': `ui-prompt-${Date.now()}`,
+          'content-type': 'application/json',
+        },
+        body: JSON.stringify({
+          preset: state.preset,
+          tier: currentTier(),
+          options: currentOptions(),
+          ...promptModeFields(),
+        }),
+      });
+    } catch (error) {
+      els.quoteStatus.textContent = 'Create video failed';
+      els.quotePanel.innerHTML = `<div class="manifest-box">${(error.payload && JSON.stringify(error.payload, null, 2)) || error.message}</div>`;
+      els.quotePanel.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+      return;
+    }
+    const job = trackNewJob({
+      jobId: result.jobId,
+      title: state.title,
+      status: result.status,
+      tier: result.tier,
+      inputKind: state.mode,
+      preset: state.preset,
+    });
+    await pollJobStatus(job);
+    // The card email is no longer sent automatically here -- the sender gets
+    // a "Send card" button in the job detail panel (see renderJobDetail())
+    // so they can watch the video first and back out if it's not right.
     await refreshBalance();
     render();
     els.jobDetail.scrollIntoView({ behavior: 'smooth', block: 'nearest' });
@@ -1781,6 +2069,24 @@ ${Object.keys(archive).length ? `\n${JSON.stringify(archive, null, 2)}` : '\nCon
       });
     });
     els.connectWallet.addEventListener('click', connectWallet);
+    if (els.copyCreditKey) {
+      els.copyCreditKey.addEventListener('click', async () => {
+        if (!state.creditKey) return;
+        try {
+          await navigator.clipboard.writeText(state.creditKey);
+          const original = els.copyCreditKey.textContent;
+          els.copyCreditKey.textContent = '✅';
+          els.copyCreditKey.title = 'Copied!';
+          setTimeout(() => {
+            els.copyCreditKey.textContent = original;
+            els.copyCreditKey.title = 'Copy credit key';
+          }, 1500);
+        } catch (_error) {
+          // Clipboard API can fail (permissions, insecure context) -- nothing
+          // destructive happens, just no visual confirmation.
+        }
+      });
+    }
     if (els.buyCreditsCta) {
       els.buyCreditsCta.addEventListener('click', () => startStripeCheckout('starter'));
     }
@@ -1788,14 +2094,7 @@ ${Object.keys(archive).length ? `\n${JSON.stringify(archive, null, 2)}` : '\nCon
       els.heroBuyStarter.addEventListener('click', () => startStripeCheckout('starter'));
     }
     if (els.heroTryFree) {
-      els.heroTryFree.addEventListener('click', () => {
-        state.mode = 'sample';
-        persistState();
-        render();
-        const samplePanel = document.querySelector('#input-mode-panel');
-        if (samplePanel) samplePanel.scrollIntoView({ behavior: 'smooth', block: 'start' });
-        createLocalSampleJob();
-      });
+      els.heroTryFree.addEventListener('click', createLocalSampleJob);
     }
     els.loadWalletJobs.addEventListener('click', async () => {
       const original = els.loadWalletJobs.textContent;
@@ -1816,6 +2115,7 @@ ${Object.keys(archive).length ? `\n${JSON.stringify(archive, null, 2)}` : '\nCon
     els.quotePurchase.addEventListener('click', quotePurchase);
     els.registerPurchase.addEventListener('click', registerPurchase);
     els.refreshBalance.addEventListener('click', refreshBalance);
+    els.redeemPromoCode.addEventListener('click', redeemPromoCode);
     els.submitJob.addEventListener('click', () => submitPaidJob());
     els.tryFreeRender.addEventListener('click', createLocalSampleJob);
     els.paymentsInfo.addEventListener('click', () => els.paymentsInfoDialog.showModal());
