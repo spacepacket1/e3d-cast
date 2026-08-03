@@ -738,8 +738,11 @@ dialog::backdrop {
 }
 
 .stripe-pack {
-  display: grid;
-  gap: 4px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  width: 100%;
   text-align: left;
   padding: 12px 14px;
   border: 1px solid var(--line);
@@ -755,16 +758,29 @@ dialog::backdrop {
   box-shadow: 0 0 0 3px rgba(31, 122, 76, 0.08);
 }
 
+.pack-info {
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  min-width: 0;
+  overflow: hidden;
+}
+
 .stripe-pack strong {
+  flex: 0 0 auto;
   font-size: 1rem;
 }
 
 .stripe-pack .pack-meta {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
   color: var(--muted);
   font-size: 0.85rem;
 }
 
 .stripe-pack .pack-price {
+  flex: 0 0 auto;
   font-family: var(--mono);
   font-weight: 700;
 }

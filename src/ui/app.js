@@ -1458,8 +1458,10 @@ ${Object.keys(archive).length ? `\n${JSON.stringify(archive, null, 2)}` : '\nCon
     if (!els.stripePacks) return;
     els.stripePacks.innerHTML = STRIPE_PACK_SKELETON.map((pack) => `
       <button type="button" class="stripe-pack is-loading" disabled>
-        <strong>${pack.name}</strong>
-        <span class="pack-meta">Loading…</span>
+        <span class="pack-info">
+          <strong>${pack.name}</strong>
+          <span class="pack-meta">Loading…</span>
+        </span>
         <span class="pack-price">$${pack.amountUsd}</span>
       </button>
     `).join('');
@@ -1471,8 +1473,10 @@ ${Object.keys(archive).length ? `\n${JSON.stringify(archive, null, 2)}` : '\nCon
       }
       els.stripePacks.innerHTML = (data.packs || []).map((pack) => `
         <button type="button" class="stripe-pack" data-pack-id="${pack.id}">
-          <strong>${pack.name}</strong>
-          <span class="pack-meta">${pack.credits.toLocaleString()} credits · ${pack.description || ''}</span>
+          <span class="pack-info">
+            <strong>${pack.name}</strong>
+            <span class="pack-meta">${pack.credits.toLocaleString()} credits · ${pack.description || ''}</span>
+          </span>
           <span class="pack-price">$${Number(pack.amountUsd).toFixed(pack.amountUsd % 1 ? 2 : 0)}</span>
         </button>
       `).join('');
