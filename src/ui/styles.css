@@ -587,6 +587,18 @@ pre {
   overflow: auto;
 }
 
+.artifact-video {
+  display: block;
+  max-width: 50%;
+  border-radius: 12px;
+}
+
+@media (max-width: 640px) {
+  .artifact-video {
+    max-width: 100%;
+  }
+}
+
 .title-logo {
   height: 0.85em;
   width: auto;

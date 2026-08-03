@@ -1241,7 +1241,7 @@
       preview.textContent = '';
       const video = document.createElement('video');
       video.controls = true;
-      video.style.maxWidth = '100%';
+      video.className = 'artifact-video';
       video.src = artifact.downloadUrl;
       preview.appendChild(video);
       return;
@@ -1262,7 +1262,7 @@
         preview.textContent = '';
         const video = document.createElement('video');
         video.controls = true;
-        video.style.maxWidth = '100%';
+        video.className = 'artifact-video';
         video.src = URL.createObjectURL(blob);
         preview.appendChild(video);
         return;
