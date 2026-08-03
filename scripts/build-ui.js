@@ -10,7 +10,7 @@ const sourceDir = path.join(rootDir, 'src', 'ui');
 const outDir = path.join(rootDir, 'dist');
 // Cache-busted by content hash below — a browser that already cached
 // app.js/styles.css under an old ?v= has no other signal to refetch them.
-const CACHE_BUSTED_ASSETS = ['app.js', 'styles.css'];
+const CACHE_BUSTED_ASSETS = ['app.js', 'styles.css', 'consent.js'];
 
 function rmrf(target) {
   fs.rmSync(target, { recursive: true, force: true });

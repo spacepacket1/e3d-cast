@@ -8,6 +8,22 @@
     <link rel="icon" type="image/x-icon" href="/favicon.ico">
     <link rel="icon" type="image/png" sizes="32x32" href="/e3d_logo_32.png">
     <link rel="stylesheet" href="/styles.css?v=1">
+    <script>
+      window.dataLayer = window.dataLayer || [];
+      function gtag(){dataLayer.push(arguments);}
+      gtag("consent", "default", {
+        "ad_storage": "denied",
+        "ad_user_data": "denied",
+        "ad_personalization": "denied",
+        "analytics_storage": "denied"
+      });
+    </script>
+    <!-- Google tag (gtag.js) -->
+    <script async src="https://www.googletagmanager.com/gtag/js?id=G-TPP7LWTWSQ"></script>
+    <script>
+      gtag("js", new Date());
+      gtag("config", "G-TPP7LWTWSQ");
+    </script>
   </head>
   <body>
     <div class="agent-page">
@@ -25,6 +41,9 @@
       <h2>Third parties involved in a render</h2>
       <p>Payment processing: Stripe. Transcription and diarization: AssemblyAI. Narration and content classification: OpenAI. Stock footage search: Pexels. Storage/hosting: AWS. Each processes only what a given job needs to complete.</p>
 
+      <h2>Analytics</h2>
+      <p>We use Google Analytics to see how visitors use Cast (pages viewed, general usage patterns) so we can improve the product. This only runs if you accept the cookie banner shown on your first visit — if you decline, no analytics cookie is set and no usage data is sent to Google. You can change your choice at any time by clearing your browser's local storage for this site. See <a href="https://policies.google.com/privacy" target="_blank" rel="noreferrer">Google's privacy policy</a> for how it handles this data.</p>
+
       <h2>Retention</h2>
       <p>Render inputs and outputs are retained per your tier's retention window (shown on the <a href="/pricing.html">pricing page</a>), then deleted. Purchase records are kept for accounting/support purposes.</p>
 
@@ -34,5 +53,6 @@
       <h2>Contact</h2>
       <p><a href="mailto:support@e3d.ai">support@e3d.ai</a></p>
     </div>
+    <script src="/consent.js"></script>
   </body>
 </html>
