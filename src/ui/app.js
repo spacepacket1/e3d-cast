@@ -350,7 +350,15 @@
       transcriptionEngine: state.mode === 'audio' ? state.transcriptionEngine : 'assemblyai',
       brandEndCard: state.brandEndCard,
       archiveToIpfs: state.archiveToIpfs,
-      transcriptText: state.transcriptText,
+      // Only meaningful for genuine Transcript-mode submissions -- the worker
+      // (e3d-cast/src/worker/index.js buildWorkerManifest) reads this as its
+      // render text for transcript-kind jobs, so sending it unconditionally
+      // used to leak whatever was left in this textarea (often still the
+      // default placeholder) into AI Prompt/Video Card/Audio submissions too.
+      // The server now overrides it with the real generated script for
+      // prompt-to-podcast jobs regardless, but there's no reason to send it
+      // at all outside Transcript mode.
+      transcriptText: state.mode === 'transcript' ? state.transcriptText : undefined,
       // Video Card mode has no voice pickers -- let the renderer fall back to
       // its own distinct Host/Guest defaults instead of sending stale values
       // left over from another mode.
