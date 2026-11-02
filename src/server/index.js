@@ -116,13 +116,35 @@ function proxyHeaders(reqHeaders, extraHeaders = {}) {
   return headers;
 }
 
+// A request target is origin-form when it is a path: one leading "/" that is not followed by "/" or "\", and no control characters. The WHATWG URL
+// parser treats "\" as "/" in special schemes and silently drops tabs and newlines, so "//host", "/\host" and "/<TAB>/host" all parse as
+// protocol-relative references that REPLACE the host. new URL(req.url, upstream) then pointed the proxy at an arbitrary server (SSRF).
+// resolveUpstream() rejects those shapes up front and, as the final guard, asserts the resolved origin is the configured upstream.
+class BadRequestTarget extends Error {}
+
+function isOriginForm(rawUrl) {
+  const raw = String(rawUrl || '');
+  return /^\/(?![/\\])/.test(raw) && !/[\u0000-\u001f\u007f]/.test(raw);
+}
+
+function resolveUpstream(rawUrl, baseUrl) {
+  if (!isOriginForm(rawUrl)) throw new BadRequestTarget('invalid request target');
+  const base = new URL(baseUrl);
+  const target = new URL(String(rawUrl), base);
+  if (target.origin !== base.origin || target.username || target.password) throw new BadRequestTarget('invalid request target');
+  return target;
+}
+
 async function proxyRequest(req, res, targetBaseUrl) {
-  const target = new URL(req.url, targetBaseUrl);
+  const target = resolveUpstream(req.url, targetBaseUrl);
   const body = ['GET', 'HEAD'].includes(req.method) ? undefined : await readBody(req);
+  // redirect: 'manual' -- a redirect from the upstream is handed back to the caller, never followed from here (a followed redirect reaches
+  // loopback and internal services on this host).
   const response = await fetch(target, {
     method: req.method,
     headers: proxyHeaders(req.headers),
     body,
+    redirect: 'manual',
   });
   res.statusCode = response.status;
   response.headers.forEach((value, key) => {
@@ -166,7 +188,7 @@ async function forwardServiceCall(req, res, targetBaseUrl, serviceToken) {
   // which treat it as optional). Wallet purchase quoting/registration works
   // without it, so a missing token must not block those routes entirely.
   const routePath = req.url.replace(/^\/ui-api/, '/api');
-  const target = new URL(routePath, targetBaseUrl);
+  const target = resolveUpstream(routePath, targetBaseUrl);
   const body = ['GET', 'HEAD'].includes(req.method) ? undefined : await readBody(req);
   const response = await fetch(target, {
     method: req.method,
@@ -175,6 +197,7 @@ async function forwardServiceCall(req, res, targetBaseUrl, serviceToken) {
       'content-type': req.headers['content-type'] || 'application/json',
     }),
     body,
+    redirect: 'manual',
   });
   res.statusCode = response.status;
   response.headers.forEach((value, key) => {
@@ -281,6 +304,11 @@ function createServer(config = {}) {
 
   return http.createServer(async (req, res) => {
     try {
+      // Refuse anything that is not a plain path before any routing: the routes below test the parsed pathname while the forwarders
+      // use the raw request target, and for "//host/..." those disagree.
+      if (!isOriginForm(req.url)) {
+        return json(res, 400, { error: 'invalid request target', code: 'BAD_REQUEST_TARGET' });
+      }
       const requestUrl = new URL(req.url, 'http://127.0.0.1');
       if (req.method === 'GET' && requestUrl.pathname === '/ui-api/config') {
         return json(res, 200, {
@@ -330,6 +358,7 @@ function createServer(config = {}) {
       }
       return serveFile(res, path.join(uiDir, 'index.html'));
     } catch (error) {
+      if (error instanceof BadRequestTarget) return json(res, 400, { error: 'invalid request target', code: 'BAD_REQUEST_TARGET' });
       return json(res, 500, {
         error: error && error.message ? error.message : 'internal_error',
         code: 'UI_SERVER_ERROR',
@@ -347,7 +376,10 @@ if (require.main === module) {
 }
 
 module.exports = {
+  BadRequestTarget,
   createServer,
+  isOriginForm,
+  resolveUpstream,
   handleUpload,
   loadDotEnv,
   proxyHeaders,
